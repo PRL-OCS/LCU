@@ -135,7 +135,7 @@ def run_test():
         
         # 1. Initialize Unified Plugin Manager
         from core.plugins.manager import PluginManager
-        from core.coordinator import ScheduleCoordinator
+        from core.schedule_coordinator import ScheduleCoordinator
         
         # Discover plugins (will find our 1m0a telescope and T1P2_IMAGER instrument)
         manager = PluginManager()

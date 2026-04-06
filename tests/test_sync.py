@@ -125,7 +125,7 @@ def run_test():
         
         # 1. Initialize Plugin Manager
         from core.plugins.manager import PluginManager
-        from core.coordinator import ScheduleCoordinator
+        from core.schedule_coordinator import ScheduleCoordinator
         
         # We need to make sure the plugin manager can find our demo plugin
         manager = PluginManager()

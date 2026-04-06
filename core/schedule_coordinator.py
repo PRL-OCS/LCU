@@ -43,7 +43,7 @@ class ScheduleCoordinator:
                 t_plugins = self.plugin_manager.get_all_telescope_plugins()
                 i_plugins = self.plugin_manager.get_all_instrument_plugins()
 
-                # 2. Logic: If we dont have either telescope or instrument plugin                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   , skip (safety)
+                # 2. Logic: If we dont have either telescope or instrument plugin, skip (safety)
                 if t_id not in t_plugins or i_name not in i_plugins:
                     print(f"[SYSTEM] Task {task.id} skipped: Telescope '{t_id}' is ready but instrument '{i_name}' plugin is missing.")
                     continue
@@ -103,11 +103,3 @@ class ScheduleCoordinator:
             print(f"[CRITICAL ERROR] Schedule sync failed: {e}")
             import traceback
             traceback.print_exc()
-            
-        except Exception as e:
-            print(f"[CRITICAL ERROR] Schedule sync failed: {e}")
-            import traceback
-            traceback.print_exc()
-            
-        except Exception as e:
-            print(f"[CRITICAL ERROR] Schedule sync failed: {e}")
