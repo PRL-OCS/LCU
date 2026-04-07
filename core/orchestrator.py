@@ -2,7 +2,11 @@ import asyncio
 from pathlib import Path
 from core.plugins.manager import PluginManager
 from core.schedule_coordinator import ScheduleCoordinator
+
 from core.states.manager import state_manager, LCUState
+
+from ingestion.file_watchdog import FileWatchdog
+
 
 class LCUOrchestrator:
     def __init__(self, storage_dir: str = "storage"):
@@ -12,6 +16,7 @@ class LCUOrchestrator:
         # Initialize internal components
         self.plugin_manager = PluginManager()
         self.coordinator = ScheduleCoordinator(self.plugin_manager)
+        self.watchdog = FileWatchdog(watch_dir=self.storage_dir / "cache")
         
         self._sync_task = None
 
@@ -23,6 +28,7 @@ class LCUOrchestrator:
         print("[ORCHESTRATOR] Initializing LCU Node subsystems...")
         self.plugin_manager.discover_plugins()
         self.plugin_manager.fetch_hardware_mapping()
+        self.watchdog.initialize()
         
         state_manager.update_system_state(LCUState.IDLE)
         
@@ -39,6 +45,7 @@ class LCUOrchestrator:
         if self._sync_task is None:
             print("[ORCHESTRATOR] Starting background scheduler...")
             self._sync_task = asyncio.create_task(self._periodic_sync_loop())
+            asyncio.create_task(self.watchdog.run_forever())
 
     async def _periodic_sync_loop(self):
         """
