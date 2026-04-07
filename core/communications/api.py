@@ -20,7 +20,7 @@ PORTAL_API_URL = os.getenv("PORTAL_API_URL", "http://localhost:8000/")
 if not PORTAL_API_URL.endswith('/'):
     PORTAL_API_URL += '/'
 
-INSTRUMENT_API_URL = f"{PORTAL_API_URL}api/instruments/"
+# INSTRUMENT_API_URL = f"{PORTAL_API_URL}api/instruments/"
 SCHEDULE_API_URL = f"{PORTAL_API_URL}api/schedule/"
 API_TOKEN = os.getenv("PRAMANA_API_TOKEN")
 
@@ -47,27 +47,27 @@ def fetch_schedule() -> ScheduleAPIResponse:
     print(f"[SYSTEM] Schedule validated successfully with {len(validated_schedule.results)} results.")
     return validated_schedule
 
-def fetch_instruments() -> InstrumentMappingResponse:
-    """
-    Fetches the instrument-telescope mapping from PRAMANA.
-    """
-    if not API_TOKEN:
-        raise ValueError("CRITICAL: PRAMANA_API_TOKEN is missing from the .env file.")
+# def fetch_instruments() -> InstrumentMappingResponse:
+#     """
+#     Fetches the instrument-telescope mapping from PRAMANA.
+#     """
+#     if not API_TOKEN:
+#         raise ValueError("CRITICAL: PRAMANA_API_TOKEN is missing from the .env file.")
 
-    headers = {
-        "Authorization": f"Token {API_TOKEN}", 
-        "Content-Type": "application/json"
-    }
+#     headers = {
+#         "Authorization": f"Token {API_TOKEN}", 
+#         "Content-Type": "application/json"
+#     }
 
-    print(f"[SYSTEM] Fetching hardware mapping from {INSTRUMENT_API_URL}...")
+#     print(f"[SYSTEM] Fetching hardware mapping from {INSTRUMENT_API_URL}...")
     
-    response = requests.get(INSTRUMENT_API_URL, headers=headers)
-    response.raise_for_status()
+#     response = requests.get(INSTRUMENT_API_URL, headers=headers)
+#     response.raise_for_status()
 
-    print(f"[SYSTEM] Hardware mapping received. Validating structure...")
-    validated_mapping = InstrumentMappingResponse.model_validate(response.json())
-    print(f"[SYSTEM] Hardware mapping validated successfully.")
-    return validated_mapping
+#     print(f"[SYSTEM] Hardware mapping received. Validating structure...")
+#     validated_mapping = InstrumentMappingResponse.model_validate(response.json())
+#     print(f"[SYSTEM] Hardware mapping validated successfully.")
+#     return validated_mapping
 
 def fetch_my_pending_tasks(my_telescope_id: str) -> List[ScheduleSchema]:
     """Dynamically fetches the schedule and filters for this specific LCU."""
