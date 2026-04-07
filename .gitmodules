@@ -1,0 +1,3 @@
+[submodule "Plugins/instrument/foc"]
+	path = Plugins/instrument/foc
+	url = c:\\prl\\PRL_OCS\\FOC_plugin

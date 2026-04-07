@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from core.plugins.manager import PluginManager
 from core.schedule_coordinator import ScheduleCoordinator
+from core.states.manager import state_manager, LCUState
 
 class LCUOrchestrator:
     def __init__(self, storage_dir: str = "storage"):
@@ -18,9 +19,12 @@ class LCUOrchestrator:
         """
         Initial plugin discovery and hardware mapping fetch.
         """
+        state_manager.update_system_state(LCUState.INITIALIZING)
         print("[ORCHESTRATOR] Initializing LCU Node subsystems...")
         self.plugin_manager.discover_plugins()
         self.plugin_manager.fetch_hardware_mapping()
+        
+        state_manager.update_system_state(LCUState.IDLE)
         
         t_count = len(self.plugin_manager.get_all_telescope_plugins())
         i_count = len(self.plugin_manager.get_all_instrument_plugins())
@@ -87,6 +91,7 @@ class LCUOrchestrator:
             
         return {
             "status": "online",
+            "state_summary": state_manager.get_summary(),
             "storage_dir": str(self.storage_dir),
             "telescope_plugins": telescope_info,
             "instrument_plugins": instrument_info
