@@ -26,6 +26,15 @@ class TelescopePlugin(ABC):
         self.storage_dir = Path(storage_dir)
         self.targets: List[Target] = []
         
+        # --- Hardware State ---
+        self.current_ra: float = 0.0          # in degrees
+        self.current_dec: float = 0.0         # in degrees
+        self.dome_status: str = "unknown"      # e.g., "open", "closed", "moving"
+        self.is_connected: bool = False
+        self.is_tracking: bool = False
+        self.is_slewing: bool = False
+        self.is_guiding: bool = False
+        
         # Determine unique storage file
         self.cache_file = self.storage_dir / f"{self.telescope_id}_targets.json"
 
@@ -34,6 +43,34 @@ class TelescopePlugin(ABC):
         """
         Callback method called by the ScheduleCoordinator when new targets 
         are available for this specific telescope.
+        """
+        pass
+
+    @abstractmethod
+    def start_schedule(self, target: Target):
+        """
+        Sets the target, starts tracking, and initiates guiding if configured.
+        """
+        pass
+
+    @abstractmethod
+    def force_stop(self):
+        """
+        Immediately stops all telescope and dome movement.
+        """
+        pass
+
+    @abstractmethod
+    def pause(self):
+        """
+        Pauses current operations gracefully if supported.
+        """
+        pass
+
+    @abstractmethod
+    def get_current_telemetry(self) -> dict:
+        """
+        Returns a snapshot of the current hardware state/telemetry.
         """
         pass
 
