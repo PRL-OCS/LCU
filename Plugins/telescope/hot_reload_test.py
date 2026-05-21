@@ -1,4 +1,4 @@
-from Plugins.base import TelescopePlugin
+from Plugins.base_telescope import TelescopePlugin
 from core.communications.schemas import Target
 from typing import List
 

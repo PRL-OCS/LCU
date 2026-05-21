@@ -3,7 +3,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 # Ensure the script can import local packages
-sys.path.append(os.getcwd())
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Mock the API Response Data
 MOCK_API_DATA = {

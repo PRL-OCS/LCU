@@ -1,0 +1,7 @@
+astropy==7.2.0
+fastapi==0.136.1
+numpy==2.4.6
+pydantic==2.13.4
+python-dotenv==1.2.2
+Requests==2.34.2
+watchdog==6.0.0

@@ -3,7 +3,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 # Ensure the script can import local packages
-sys.path.append(os.getcwd())
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Mock the API Response Data
 MOCK_API_DATA = {
@@ -139,10 +139,10 @@ def run_test():
         
         # 4. Verify results in plugins
         print("\n[VERIFICATION]")
-        for telescope_id, plugin in manager.registry.items():
-            print(f"Plugin '{telescope_id}' task count: {len(plugin.tasks)}")
-            if len(plugin.tasks) > 0:
-                print(f"  First task target: {plugin.tasks[0].request.configurations[0].target.name}")
+        for telescope_id, plugin in manager.get_all_telescope_plugins().items():
+            print(f"Plugin '{telescope_id}' task count: {len(plugin.targets)}")
+            if len(plugin.targets) > 0:
+                print(f"  First task target: {plugin.targets[0].name}")
 
 if __name__ == "__main__":
     run_test()

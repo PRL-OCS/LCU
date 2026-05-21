@@ -1,7 +1,8 @@
 from typing import List
-from Plugins.base import TelescopePlugin
+from Plugins.base_telescope import TelescopePlugin
 from core.communications.schemas import Target
-from .telescope_driver import TelescopeDriver
+from Plugins.telescope.T1P2.telescope_driver import TelescopeDriver
+from Plugins.telescope.T1P2.errors import TelescopeConnectionError, TelescopeSlewError, TelescopeTrackingError, TelescopeStopError
 
 class DefaultTelescope(TelescopePlugin):
     """
@@ -15,10 +16,12 @@ class DefaultTelescope(TelescopePlugin):
         
         # Initialize the hardware driver
         self.driver = TelescopeDriver()
-        if self.driver.connect():
-            print(f"[PLUGIN-TEL] {self.telescope_id} successfully connected to hardware.")
-        else:
-            print(f"[PLUGIN-TEL] {self.telescope_id} failed to connect to hardware.")
+        try:
+            if self.driver.connect():
+                print(f"[PLUGIN-TEL] {self.telescope_id} successfully connected to hardware.")
+        except TelescopeConnectionError as e:
+            print(f"[PLUGIN-TEL ERROR] {self.telescope_id} failed to connect to hardware: {e}")
+            raise
 
         # Load from disk on startup if a cache exists
         self.load_from_disk()

@@ -43,7 +43,7 @@ class TelescopeTelemetry:
     def start(self):
         """Starts the background telemetry monitoring thread."""
         if self.running or not self.tn:
-            return+
+            return
         
         self.setup_monitoring()
         self.running = True

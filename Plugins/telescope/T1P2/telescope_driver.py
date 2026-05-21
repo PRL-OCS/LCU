@@ -2,7 +2,8 @@ import threading
 import time
 from telnetlib import Telnet
 from typing import Dict, Any, Optional
-from .telescope_telemetry import TelescopeTelemetry
+from Plugins.telescope.T1P2.telescope_telemetry import TelescopeTelemetry
+from Plugins.telescope.T1P2.errors import TelescopeConnectionError, TelescopeSlewError, TelescopeTrackingError, TelescopeStopError
 
 class TelescopeDriver:
     """
@@ -34,9 +35,8 @@ class TelescopeDriver:
             print(f"[DRIVER] Connected to {self.host}:{self.port}")
             return True
         except Exception as e:
-            print(f"[DRIVER ERROR] Connection failed: {e}")
             self.is_connected = False
-            return False
+            raise TelescopeConnectionError(f"Connection failed: {e}") from e
 
     def disconnect(self):
         """Shut down monitoring and close connection."""
@@ -50,7 +50,8 @@ class TelescopeDriver:
 
     def slew_to(self, ra_deg: float, dec_deg: float):
         """Sets target coordinates and begins slew."""
-        if not self.is_connected: return
+        if not self.is_connected:
+            raise TelescopeConnectionError("Cannot slew: Telescope is not connected.")
         
         ra_hours = ra_deg / 15.0
         try:
@@ -60,21 +61,23 @@ class TelescopeDriver:
                 self.tn.write(b"slew\r\n")
             print(f"[DRIVER] Slewing to RA={ra_deg}, Dec={dec_deg}")
         except Exception as e:
-            print(f"[DRIVER ERROR] Slew failed: {e}")
+            raise TelescopeSlewError(f"Slew failed: {e}") from e
 
     def stop(self):
         """Immediately stops all mount movement."""
-        if not self.is_connected: return
+        if not self.is_connected:
+            raise TelescopeConnectionError("Cannot stop: Telescope is not connected.")
         try:
             with self.lock:
                 self.tn.write(b"stop\r\n")
             print("[DRIVER] Emergency stop command sent.")
         except Exception as e:
-            print(f"[DRIVER ERROR] Stop failed: {e}")
+            raise TelescopeStopError(f"Stop failed: {e}") from e
 
     def set_tracking(self, enabled: bool):
         """Enable or disable mount tracking."""
-        if not self.is_connected: return
+        if not self.is_connected:
+            raise TelescopeConnectionError("Cannot set tracking: Telescope is not connected.")
         val = 1 if enabled else 0
         try:
             with self.lock:
@@ -82,7 +85,7 @@ class TelescopeDriver:
             self.telemetry.is_tracking = enabled
             print(f"[DRIVER] Tracking set to: {enabled}")
         except Exception as e:
-            print(f"[DRIVER ERROR] Set tracking failed: {e}")
+            raise TelescopeTrackingError(f"Set tracking failed: {e}") from e
 
     def get_status(self) -> Dict[str, Any]:
         """Returns a snapshot of the current state, combining telemetry and local state."""
