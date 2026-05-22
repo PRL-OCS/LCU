@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from pathlib import Path
 from core.communications.schemas import Target
+from core.logging_config import logger
 
 class TelescopePlugin(ABC):
     """
@@ -19,7 +20,7 @@ class TelescopePlugin(ABC):
         super().__init_subclass__(**kwargs)
         # Register the class using its own name
         TelescopePlugin.registry[cls.__name__] = cls
-        print(f"[REGISTRY-TEL] Discovered telescope plugin class: {cls.__name__}")
+        logger.debug(f"Discovered telescope plugin class: {cls.__name__}")
 
     def __init__(self, telescope_id: str, storage_dir: str = "storage/telescope"):
         self.telescope_id = telescope_id
@@ -38,30 +39,48 @@ class TelescopePlugin(ABC):
         # Determine unique storage file
         self.cache_file = self.storage_dir / f"{self.telescope_id}_targets.json"
 
-    @abstractmethod
     def receive_schedule(self, targets: List[Target]):
         """
         Callback method called by the ScheduleCoordinator when new targets 
         are available for this specific telescope.
         """
+        self.targets = targets
+        logger.info(f"[{self.telescope_id}] received {len(targets)} new targets.")
+        self.save_to_disk()
+
+    def get_next_target(self) -> Target | None:
+        """
+        Pops and returns the next target in the queue.
+        """
+        if self.targets:
+            target = self.targets.pop(0)
+            self.save_to_disk()
+            return target
+        return None
+
+    @abstractmethod
+    async def slew_to_target(self, target: Target):
+        """
+        Slews the telescope to the specified target coordinates.
+        """
         pass
 
     @abstractmethod
-    def start_schedule(self, target: Target):
+    async def start_tracking(self, target: Target):
         """
         Sets the target, starts tracking, and initiates guiding if configured.
         """
         pass
 
     @abstractmethod
-    def force_stop(self):
+    async def force_stop(self):
         """
         Immediately stops all telescope and dome movement.
         """
         pass
 
     @abstractmethod
-    def pause(self):
+    async def pause(self):
         """
         Pauses current operations gracefully if supported.
         """
@@ -88,16 +107,16 @@ class TelescopePlugin(ABC):
             with open(self.cache_file, "w") as f:
                 json.dump(target_data, f, indent=4, default=str)
                 
-            print(f"[DISK-TEL] Persisted {len(self.targets)} targets to {self.cache_file}")
+            logger.debug(f"Persisted {len(self.targets)} targets to {self.cache_file}")
         except Exception as e:
-            print(f"[DISK ERROR] Failed to save targets for {self.telescope_id}: {e}")
+            logger.error(f"Failed to save targets for {self.telescope_id}: {e}", exc_info=True)
 
     def load_from_disk(self):
         """
         Restores targets from the local JSON file if it exists.
         """
         if not self.cache_file.exists():
-            print(f"[DISK-TEL] No cache file found for {self.telescope_id}.")
+            logger.debug(f"No cache file found for {self.telescope_id}.")
             return
 
         try:
@@ -106,9 +125,9 @@ class TelescopePlugin(ABC):
                 
             # Re-validate data back into Pydantic models
             self.targets = [Target.model_validate(t) for t in raw_data]
-            print(f"[DISK-TEL] Restored {len(self.targets)} targets from {self.cache_file}")
+            logger.info(f"Restored {len(self.targets)} targets from {self.cache_file}")
         except Exception as e:
-            print(f"[DISK ERROR] Failed to load targets for {self.telescope_id}: {e}")
+            logger.error(f"Failed to load targets for {self.telescope_id}: {e}", exc_info=True)
 
     def get_id(self) -> str:
         return self.telescope_id

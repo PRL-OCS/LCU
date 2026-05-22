@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from pathlib import Path
 from core.communications.schemas import Configuration
+from core.logging_config import logger
 
 class InstrumentPlugin(ABC):
     """
@@ -19,7 +20,7 @@ class InstrumentPlugin(ABC):
         super().__init_subclass__(**kwargs)
         # Register the class using its own name
         InstrumentPlugin.registry[cls.__name__] = cls
-        print(f"[REGISTRY-INST] Discovered instrument plugin class: {cls.__name__}")
+        logger.debug(f"Discovered instrument plugin class: {cls.__name__}")
 
     def __init__(self, instrument_name: str, storage_dir: str = "storage/instrument"):
         self.instrument_name = instrument_name
@@ -35,8 +36,31 @@ class InstrumentPlugin(ABC):
         Can be overridden by subclasses if special processing is needed.
         """
         self.configs = configs
-        print(f"[DISK-INST] {self.instrument_name} received {len(configs)} new configs.")
+        logger.info(f"[{self.instrument_name}] received {len(configs)} new configs.")
         self.save_to_disk()
+
+    def get_configuration(self, config_id: str) -> Configuration | None:
+        """
+        Retrieves a specific configuration by ID.
+        """
+        for config in self.configs:
+            if config.id == config_id:
+                return config
+        return None
+
+    @abstractmethod
+    async def configure(self, config: Configuration):
+        """
+        Applies the configuration to the instrument (e.g., filters, readout mode).
+        """
+        pass
+
+    @abstractmethod
+    async def expose(self, config: Configuration):
+        """
+        Triggers the exposure and waits for it to complete.
+        """
+        pass
 
 
     def save_to_disk(self):
@@ -50,26 +74,27 @@ class InstrumentPlugin(ABC):
             with open(self.cache_file, "w") as f:
                 json.dump(config_data, f, indent=4, default=str)
                 
-            print(f"[DISK-INST] Persisted {len(self.configs)} configs to {self.cache_file}")
+            logger.debug(f"Persisted {len(self.configs)} configs to {self.cache_file}")
         except Exception as e:
-            print(f"[DISK ERROR] Failed to save configs for {self.instrument_name}: {e}")
+            logger.error(f"Failed to save configs for {self.instrument_name}: {e}", exc_info=True)
 
     def load_from_disk(self):
         """
         Restores configs from the local JSON file if it exists.
         """
         if not self.cache_file.exists():
-            print(f"[DISK-INST] No cache file found for {self.instrument_name}.")
+            logger.debug(f"No cache file found for {self.instrument_name}.")
             return
 
         try:
             with open(self.cache_file, "r") as f:
                 raw_data = json.load(f)
-            
+                
+            # Re-validate data back into Pydantic models
             self.configs = [Configuration.model_validate(c) for c in raw_data]
-            print(f"[DISK-INST] Restored {len(self.configs)} configs from {self.cache_file}")
+            logger.info(f"Restored {len(self.configs)} configs from {self.cache_file}")
         except Exception as e:
-            print(f"[DISK ERROR] Failed to load configs for {self.instrument_name}: {e}")
+            logger.error(f"Failed to load configs for {self.instrument_name}: {e}", exc_info=True)
 
     def get_id(self) -> str:
         return self.instrument_name

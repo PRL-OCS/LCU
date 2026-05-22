@@ -1,7 +1,10 @@
 import os
 import requests
+import os
+import requests
 from typing import List
 from dotenv import load_dotenv
+from core.logging_config import logger
 
 # Import the strict schemas
 # Using relative import since this is part of the core.communications package
@@ -37,14 +40,14 @@ def fetch_schedule() -> ScheduleAPIResponse:
         "Content-Type": "application/json"
     }
 
-    print(f"[SYSTEM] Connecting to PRAMANA at {SCHEDULE_API_URL}...")
+    logger.info(f"Connecting to PRAMANA at {SCHEDULE_API_URL}...")
     
     response = requests.get(SCHEDULE_API_URL, headers=headers)
     response.raise_for_status()
 
-    print(f"[SYSTEM] Data received from {SCHEDULE_API_URL}. Validating...")
+    logger.info(f"Data received from {SCHEDULE_API_URL}. Validating...")
     validated_schedule = ScheduleAPIResponse.model_validate(response.json())
-    print(f"[SYSTEM] Schedule validated successfully with {len(validated_schedule.results)} results.")
+    logger.info(f"Schedule validated successfully with {len(validated_schedule.results)} results.")
     return validated_schedule
 
 def fetch_instruments() -> InstrumentMappingResponse:
@@ -59,14 +62,14 @@ def fetch_instruments() -> InstrumentMappingResponse:
         "Content-Type": "application/json"
     }
 
-    print(f"[SYSTEM] Fetching hardware mapping from {INSTRUMENT_API_URL}...")
+    logger.info(f"Fetching hardware mapping from {INSTRUMENT_API_URL}...")
     
     response = requests.get(INSTRUMENT_API_URL, headers=headers)
     response.raise_for_status()
 
-    print(f"[SYSTEM] Hardware mapping received. Validating structure...")
+    logger.info("Hardware mapping received. Validating structure...")
     validated_mapping = InstrumentMappingResponse.model_validate(response.json())
-    print(f"[SYSTEM] Hardware mapping validated successfully.")
+    logger.info("Hardware mapping validated successfully.")
     return validated_mapping
 
 def fetch_my_pending_tasks(my_telescope_id: str) -> List[ScheduleSchema]:
@@ -83,10 +86,10 @@ def fetch_my_pending_tasks(my_telescope_id: str) -> List[ScheduleSchema]:
         return my_tasks
         
     except requests.exceptions.HTTPError as http_err:
-        print(f"[ERROR] API Authentication Failed. Details: {http_err}")
+        logger.error(f"API Authentication Failed. Details: {http_err}")
         return []
     except Exception as e:
-        print(f"[ERROR] System failure: {e}")
+        logger.error(f"System failure: {e}", exc_info=True)
         return []
 
 if __name__ == "__main__":

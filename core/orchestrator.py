@@ -4,6 +4,8 @@ from core.plugins.manager import PluginManager
 from core.schedule_coordinator import ScheduleCoordinator
 
 from core.states.manager import state_manager, LCUState
+from core.executors.manager import executor_manager
+from core.logging_config import logger
 
 from ingestion.file_watchdog import FileWatchdog
 
@@ -25,10 +27,12 @@ class LCUOrchestrator:
         Initial plugin discovery and hardware mapping fetch.
         """
         state_manager.update_system_state(LCUState.INITIALIZING)
-        print("[ORCHESTRATOR] Initializing LCU Node subsystems...")
+        logger.info("Initializing LCU Node subsystems...")
         self.plugin_manager.discover_plugins()
         self.plugin_manager.fetch_hardware_mapping()
         self.watchdog.initialize()
+        
+        executor_manager.start_all(self.plugin_manager)
         
         state_manager.update_system_state(LCUState.IDLE)
         
@@ -36,14 +40,14 @@ class LCUOrchestrator:
         i_count = len(self.plugin_manager.get_all_instrument_plugins())
         m_count = len(self.plugin_manager.hardware_mapping)
         
-        print(f"[ORCHESTRATOR] LCU Node ready with {t_count} telescopes, {i_count} instruments, and {m_count} mappings.")
+        logger.info(f"LCU Node ready with {t_count} telescopes, {i_count} instruments, and {m_count} mappings.")
 
     def start_background_tasks(self):
         """
         Starts the automated background loops.
         """
         if self._sync_task is None:
-            print("[ORCHESTRATOR] Starting background scheduler...")
+            logger.info("Starting background scheduler...")
             self._sync_task = asyncio.create_task(self._periodic_sync_loop())
             asyncio.create_task(self.watchdog.run_forever())
 
@@ -51,12 +55,12 @@ class LCUOrchestrator:
         """
         Automated background loop that triggers a sync every 5 minutes.
         """
-        print("[ORCHESTRATOR] Background sync loop started (Interval: 5 minutes).")
+        logger.info("Background sync loop started (Interval: 5 minutes).")
         while True:
             try:
                 self.coordinator.sync_all()
             except Exception as e:
-                print(f"[ORCHESTRATOR ERROR] Periodic sync failed: {e}")
+                logger.error(f"Periodic sync failed: {e}")
             
             await asyncio.sleep(300)
 
@@ -101,7 +105,8 @@ class LCUOrchestrator:
             "state_summary": state_manager.get_summary(),
             "storage_dir": str(self.storage_dir),
             "telescope_plugins": telescope_info,
-            "instrument_plugins": instrument_info
+            "instrument_plugins": instrument_info,
+            "executors": executor_manager.get_status()
         }
 
 # Singleton instance for high-level control

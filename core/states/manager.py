@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from .schemas import LCUState, ObservationState, ObservationStatus
+from core.logging_config import logger
 
 class StateManager:
     """
@@ -11,14 +12,14 @@ class StateManager:
         self.system_state: LCUState = LCUState.INITIALIZING
         self.observations: Dict[str, ObservationStatus] = {}
         self.last_update: datetime = datetime.now()
-        print(f"[SYSTEM] StateManager initialized at {self.last_update}")
+        logger.info(f"StateManager initialized at {self.last_update}")
 
     def update_system_state(self, new_state: LCUState):
         """Sets the overall system performance state."""
         if new_state == self.system_state:
             return
             
-        print(f"[STATE] System Transition: {self.system_state.value} -> {new_state.value}")
+        logger.info(f"System Transition: {self.system_state.value} -> {new_state.value}")
         self.system_state = new_state
         self.last_update = datetime.now()
 
@@ -28,7 +29,7 @@ class StateManager:
         Allocates new status tracking if not already present.
         """
         if obs_id not in self.observations:
-            print(f"[STATE] New lifecycle started: {obs_id}")
+            logger.info(f"New lifecycle started: {obs_id}")
             self.observations[obs_id] = ObservationStatus(id=obs_id)
 
         status = self.observations[obs_id]
@@ -36,13 +37,13 @@ class StateManager:
         # Validation: check for illegal jumps or re-entry into terminal states
         if status.current_state in [ObservationState.COMPLETED, ObservationState.FAILED, ObservationState.ABORTED]:
             if new_state != status.current_state:
-                print(f"[WARNING] Blocked attempt to transition {obs_id} out of terminal state {status.current_state.value}")
+                logger.warning(f"Blocked attempt to transition {obs_id} out of terminal state {status.current_state.value}")
                 return
 
         if status.current_state == new_state:
             return
 
-        print(f"[STATE] {obs_id}: {status.current_state.value} -> {new_state.value}")
+        logger.info(f"Observation {obs_id}: {status.current_state.value} -> {new_state.value}")
         status.add_transition(new_state, reason=reason)
         self.last_update = datetime.now()
 
