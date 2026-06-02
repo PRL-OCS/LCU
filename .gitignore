@@ -1,7 +1,8 @@
 # User requested
 *.json
 __pycache__/
-
+*.fits
+storage/
 # Python
 *.py[cod]
 *$py.class

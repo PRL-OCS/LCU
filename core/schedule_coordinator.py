@@ -1,7 +1,7 @@
 from core.communications.api import fetch_schedule
 from core.plugins.manager import PluginManager
 from typing import List, Dict
-from core.communications.schemas import ScheduleSchema, Target, Configuration
+from core.communications.schemas import ScheduleSchema
 from core.logging_config import logger
 
 class ScheduleCoordinator:
@@ -14,8 +14,7 @@ class ScheduleCoordinator:
         
         1. Fetches the entire schedule.
         2. Groups tasks by telescope and instrument.
-        3. Extracts subsets (Target and InstrumentConfig).
-        4. Distributes to respective plugins.
+        3. Distributes the intact ScheduleSchema payload to respective plugins.
         """
         logger.info("Starting schedule sync...")
         
@@ -26,8 +25,8 @@ class ScheduleCoordinator:
             logger.info(f"Fetched {len(all_tasks)} tasks from API.")
             
             # 2. Group tasks
-            grouped_by_telescope: Dict[str, List[Target]] = {}
-            grouped_by_instrument: Dict[str, List[Configuration]] = {}
+            grouped_by_telescope: Dict[str, List[ScheduleSchema]] = {}
+            grouped_by_instrument: Dict[str, List[ScheduleSchema]] = {}
 
             for task in all_tasks:
                 if not task.request.configurations:
@@ -53,23 +52,19 @@ class ScheduleCoordinator:
                 # ------------------------------
 
 
-                # Extract Target for Telescope
+                # Group for Telescope
                 if t_id not in grouped_by_telescope:
                     grouped_by_telescope[t_id] = []
                 
-                # Use the target from the first configuration and "stamp" it with the configuration ID
-                first_config = task.request.configurations[0]
-                target = first_config.target.model_copy(update={"configuration_id": first_config.id})
-                grouped_by_telescope[t_id].append(target)
+                # Append the entire observation envelope
+                grouped_by_telescope[t_id].append(task)
 
 
-                # Extract InstrumentConfigs for Instrument
+                # Group for Instrument
                 if i_name not in grouped_by_instrument:
                     grouped_by_instrument[i_name] = []
                 
-                # Flatten all configurations in this task
-                for config in task.request.configurations:
-                    grouped_by_instrument[i_name].append(config)
+                grouped_by_instrument[i_name].append(task)
             
             # 3. Distribute to Telescope Plugins
             t_plugins = self.plugin_manager.get_all_telescope_plugins()

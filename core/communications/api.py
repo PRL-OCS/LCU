@@ -24,7 +24,7 @@ if not PORTAL_API_URL.endswith('/'):
     PORTAL_API_URL += '/'
 
 INSTRUMENT_API_URL = f"{PORTAL_API_URL}api/instruments/"
-SCHEDULE_API_URL = f"{PORTAL_API_URL}api/schedule/"
+SCHEDULE_API_URL = f"{PORTAL_API_URL}api/schedule/?ordering=start"
 API_TOKEN = os.getenv("PRAMANA_API_TOKEN")
 
 def fetch_schedule() -> ScheduleAPIResponse:
