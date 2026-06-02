@@ -1,3 +1,6 @@
 [submodule "Plugins/instrument/foc"]
 	path = Plugins/instrument/foc
 	url = https://github.com/PRL-OCS/foc_plugin.git
+[submodule "Plugins/telescope/T2P5"]
+	path = Plugins/telescope/T2P5
+	url = https://github.com/PRL-OCS/T2P5_Plugin.git

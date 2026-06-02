@@ -1,5 +1,6 @@
 import os
 import importlib.util
+import inspect
 from typing import Dict
 from Plugins.base_telescope import TelescopePlugin
 from Plugins.base_instrument import InstrumentPlugin
