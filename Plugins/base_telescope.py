@@ -27,9 +27,9 @@ class TelescopePlugin(ABC):
         self.storage_dir = Path(storage_dir)
         self.observations: List[ScheduleSchema] = []
         
-        # --- Hardware State ---
-        self.current_ra: float = 0.0          # in degrees
-        self.current_dec: float = 0.0         # in degrees
+        # --- Hardware State (Default: Parked at Zenith) ---
+        self.current_ra: float = 0.0          # Zenith RA
+        self.current_dec: float = 90.0        # Zenith DEC
         self.dome_status: str = "unknown"      # e.g., "open", "closed", "moving"
         self.is_connected: bool = False
         self.is_tracking: bool = False

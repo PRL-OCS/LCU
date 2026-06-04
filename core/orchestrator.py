@@ -70,6 +70,16 @@ class LCUOrchestrator:
         """
         self.coordinator.sync_all()
 
+    def set_operating_mode(self, manual: bool):
+        """
+        Switches the system into or out of MANUAL operator mode.
+        """
+        from core.states.schemas import LCUState
+        if manual:
+            state_manager.update_system_state(LCUState.MANUAL)
+        else:
+            state_manager.update_system_state(LCUState.IDLE)
+
     def rescan_plugins(self):
         """
         Manually trigger discovery scan.
@@ -88,25 +98,39 @@ class LCUOrchestrator:
         """
         telescope_info = {}
         for tid, plugin in self.plugin_manager.get_all_telescope_plugins().items():
+            queued_reqs = []
+            for obs in getattr(plugin, 'observations', []):
+                queued_reqs.append(f"req_{obs.request.id}")
+                
             telescope_info[tid] = {
-                "target_count": len(plugin.targets),
+                "queue_size": len(queued_reqs),
+                "queued_items": queued_reqs,
                 "cached_file": str(plugin.cache_file) if hasattr(plugin, 'cache_file') else None
             }
         
         instrument_info = {}
         for iid, plugin in self.plugin_manager.get_all_instrument_plugins().items():
+            queued_cfgs = []
+            for obs in getattr(plugin, 'observations', []):
+                for cfg in obs.request.configurations:
+                    queued_cfgs.append(f"cfg_{cfg.id}")
+                    
             instrument_info[iid] = {
-                "config_count": len(plugin.configs),
+                "queue_size": len(queued_cfgs),
+                "queued_items": queued_cfgs,
                 "cached_file": str(plugin.cache_file) if hasattr(plugin, 'cache_file') else None
             }
             
+        from core.logging_config import recent_logs
         return {
             "status": "online",
             "state_summary": state_manager.get_summary(),
             "storage_dir": str(self.storage_dir),
             "telescope_plugins": telescope_info,
             "instrument_plugins": instrument_info,
-            "executors": executor_manager.get_status()
+            "executors": executor_manager.get_status(),
+            "hardware_mapping": self.plugin_manager.hardware_mapping,
+            "recent_logs": list(recent_logs)
         }
 
 # Singleton instance for high-level control

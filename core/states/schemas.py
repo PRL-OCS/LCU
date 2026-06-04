@@ -10,6 +10,7 @@ class LCUState(str, Enum):
     SYNCING = "SYNCING"
     BUSY = "BUSY"
     ERROR = "ERROR"
+    MANUAL = "MANUAL"
     SHUTTING_DOWN = "SHUTTING_DOWN"
 
 class ObservationState(str, Enum):

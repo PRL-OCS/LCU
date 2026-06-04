@@ -3,6 +3,8 @@ import asyncio
 from pathlib import Path
 from fastapi import FastAPI, BackgroundTasks
 from core.orchestrator import orchestrator
+from nicegui import ui
+import ui as lcu_ui
 
 app = FastAPI(title="LCU_Node")
 
@@ -53,8 +55,8 @@ def get_telescope_tasks(telescope_id: str):
     
     return {
         "telescope_id": telescope_id,
-        "target_count": len(plugin.targets),
-        "targets": [target.model_dump() for target in plugin.targets]
+        "target_count": len(plugin.observations),
+        "targets": [obs.model_dump() for obs in plugin.observations]
     }
 
 @app.get("/instrument/{instrument_id}/tasks")
@@ -68,6 +70,10 @@ def get_instrument_tasks(instrument_id: str):
     
     return {
         "instrument_id": instrument_id,
-        "config_count": len(plugin.configs),
-        "configs": [config.model_dump() for config in plugin.configs]
+        "config_count": len(plugin.observations),
+        "configs": [obs.model_dump() for obs in plugin.observations]
     }
+
+# Build and mount the NiceGUI interface
+ui.run_with(app, title="LCU Dashboard", mount_path="/dashboard", storage_secret="lcu_secret")
+

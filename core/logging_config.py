@@ -1,6 +1,17 @@
 import logging
 import sys
+import collections
 from pathlib import Path
+
+recent_logs = collections.deque(maxlen=50)
+
+class MemoryLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            recent_logs.append(msg)
+        except Exception:
+            self.handleError(record)
 
 # Create logs directory if it doesn't exist
 LOG_DIR = Path("storage/logs")
@@ -35,9 +46,15 @@ def setup_logger(name: str = "LCU") -> logging.Logger:
     file_handler = logging.FileHandler(LOG_FILE)
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
+    
+    # Memory Handler for UI
+    memory_handler = MemoryLogHandler()
+    memory_handler.setLevel(logging.INFO)
+    memory_handler.setFormatter(formatter)
 
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
+    logger.addHandler(memory_handler)
 
     return logger
 

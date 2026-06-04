@@ -17,25 +17,6 @@ class InstrumentPlugin(ABC):
     registry = {}
 
     def __init_subclass__(cls, **kwargs):
-import os
-import json
-from abc import ABC, abstractmethod
-from typing import List
-from pathlib import Path
-from core.communications.schemas import ScheduleSchema
-from core.logging_config import logger
-
-class InstrumentPlugin(ABC):
-    """
-    Abstract base class for all instrument plugins in LCU_Node.
-    Now receives the full Configuration data model.
-    Persists to storage/instrument.
-    """
-    
-    # Class-level registry for discovered instrument blueprint classes
-    registry = {}
-
-    def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         # Register the class using its own name
         InstrumentPlugin.registry[cls.__name__] = cls
@@ -70,6 +51,22 @@ class InstrumentPlugin(ABC):
         for obs in self.observations:
             if obs.request.configurations and obs.request.configurations[0].id == obs_id:
                 return obs
+        return None
+
+    def get_configuration(self, config_id: int) -> Configuration | None:
+        """
+        Returns the matching configuration and REMOVES it from the observation queue.
+        This allows the executor to process the config while keeping the UI queue in sync.
+        """
+        for i, obs in enumerate(self.observations):
+            for j, config in enumerate(obs.request.configurations):
+                if config.id == config_id:
+                    matched_config = obs.request.configurations.pop(j)
+                    # If this was the last config in the observation, pop the observation
+                    if len(obs.request.configurations) == 0:
+                        self.observations.pop(i)
+                    self.save_to_disk()
+                    return matched_config
         return None
 
     @abstractmethod
