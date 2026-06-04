@@ -26,6 +26,7 @@ class TelescopePlugin(ABC):
         self.telescope_id = telescope_id
         self.storage_dir = Path(storage_dir)
         self.observations: List[ScheduleSchema] = []
+        self.targets: List[Target] = []
         
         # --- Hardware State (Default: Parked at Zenith) ---
         self.current_ra: float = 0.0          # Zenith RA
@@ -45,7 +46,15 @@ class TelescopePlugin(ABC):
         are available for this specific telescope.
         """
         self.observations = observations
-        logger.info(f"[{self.telescope_id}] received {len(observations)} new observations.")
+        self.targets = []
+        for obs in observations:
+            if obs.request and obs.request.configurations:
+                for config in obs.request.configurations:
+                    if config.target:
+                        target = config.target
+                        target.configuration_id = config.id
+                        self.targets.append(target)
+        logger.info(f"[{self.telescope_id}] received {len(observations)} new observations ({len(self.targets)} targets).")
         self.save_to_disk()
 
     def get_next_observation(self) -> ScheduleSchema | None:
@@ -63,6 +72,21 @@ class TelescopePlugin(ABC):
         if self.observations:
             self.observations.pop(0)
             self.save_to_disk()
+    def get_next_target(self) -> Target | None:
+        """
+        Pops and returns the next target in the queue, keeping observations in sync.
+        """
+        if self.targets:
+            target = self.targets.pop(0)
+            # Remove the observation that matches this target's configuration_id
+            self.observations = [
+                obs for obs in self.observations
+                if not (obs.request and obs.request.configurations and 
+                        any(c.id == target.configuration_id for c in obs.request.configurations))
+            ]
+            self.save_to_disk()
+            return target
+        return None
 
     @abstractmethod
     async def slew_to_target(self, target: Target):
@@ -131,7 +155,16 @@ class TelescopePlugin(ABC):
                 
             # Re-validate data back into Pydantic models
             self.observations = [ScheduleSchema.model_validate(o) for o in raw_data]
-            logger.info(f"Restored {len(self.observations)} observations from {self.cache_file}")
+            # Rebuild self.targets
+            self.targets = []
+            for obs in self.observations:
+                if obs.request and obs.request.configurations:
+                    for config in obs.request.configurations:
+                        if config.target:
+                            target = config.target
+                            target.configuration_id = config.id
+                            self.targets.append(target)
+            logger.info(f"Restored {len(self.observations)} observations ({len(self.targets)} targets) from {self.cache_file}")
         except Exception as e:
             logger.error(f"Failed to load observations for {self.telescope_id}: {e}", exc_info=True)
 

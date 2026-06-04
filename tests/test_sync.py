@@ -1,5 +1,6 @@
 import sys
 import os
+os.environ["PRAMANA_API_TOKEN"] = "mock_token"
 from unittest.mock import MagicMock, patch
 
 # Ensure the script can import local packages

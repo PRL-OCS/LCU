@@ -33,3 +33,10 @@ class T1P2ImagerPlugin(InstrumentPlugin):
                 filter_val = ic.optical_elements.get('filter') or ic.optical_elements.get('Slit') or "Unknown"
                 print(f"  {i+1}.{j+1} [CONFIG] Opt: {filter_val} | Exp: {ic.exposure_time}s | Mode: {config.type}")
 
+    async def configure(self, config: Configuration):
+        print(f"[PLUGIN-INST] {self.instrument_name} configure called.")
+
+    async def expose(self, config: Configuration):
+        print(f"[PLUGIN-INST] {self.instrument_name} expose called.")
+
+

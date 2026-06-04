@@ -1,5 +1,7 @@
+# Set mock environment variable before loading core imports
 import os
-import sys
+os.environ["PRAMANA_API_TOKEN"] = "mock_token"
+
 import unittest
 import asyncio
 from unittest.mock import patch, MagicMock
