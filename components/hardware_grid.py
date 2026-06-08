@@ -69,9 +69,18 @@ def _build_dom(hardware_container, status):
                                 with ui.row().classes('flex justify-between terminal-bg p-xs rounded border border-outline-variant/20 w-full items-center'):
                                     ui.label('DEC:').classes('text-label-sm font-label-sm text-on-surface-variant')
                                     hardware_container._ui_elements[f'{t_id}_dec'] = ui.label('').classes('font-data-mono text-data-mono text-primary')
-                                
-                                # Dynamic Extra Telemetry fields
-                                hardware_container._ui_elements[f'{t_id}_extra_telemetry'] = ui.column().classes('space-y-xs w-full gap-2')
+                                with ui.row().classes('flex justify-between terminal-bg p-xs rounded border border-outline-variant/20 w-full items-center'):
+                                    ui.label('Connection:').classes('text-label-sm font-label-sm text-on-surface-variant')
+                                    hardware_container._ui_elements[f'{t_id}_connected'] = ui.label('').classes('font-data-mono text-data-mono')
+                                with ui.row().classes('flex justify-between terminal-bg p-xs rounded border border-outline-variant/20 w-full items-center'):
+                                    ui.label('Skychart:').classes('text-label-sm font-label-sm text-on-surface-variant')
+                                    hardware_container._ui_elements[f'{t_id}_skychart'] = ui.label('').classes('font-data-mono text-data-mono')
+                                with ui.row().classes('flex justify-between terminal-bg p-xs rounded border border-outline-variant/20 w-full items-center'):
+                                    ui.label('Slewing:').classes('text-label-sm font-label-sm text-on-surface-variant')
+                                    hardware_container._ui_elements[f'{t_id}_slewing'] = ui.label('').classes('font-data-mono text-data-mono')
+                                with ui.row().classes('flex justify-between terminal-bg p-xs rounded border border-outline-variant/20 w-full items-center'):
+                                    ui.label('Tracking:').classes('text-label-sm font-label-sm text-on-surface-variant')
+                                    hardware_container._ui_elements[f'{t_id}_tracking'] = ui.label('').classes('font-data-mono text-data-mono')
                         
                         # Instrument Status
                         for i_id in telescope_to_instruments[t_id]:
@@ -158,6 +167,33 @@ def update_hardware_grid(hardware_container, status):
             hardware_container._ui_elements[f'{t_id}_ra'].set_text(f'{format_ra(current_ra)}')
             hardware_container._ui_elements[f'{t_id}_dec'].set_text(f'{format_dec(current_dec)}')
             
+        # Update connection, skychart, slewing, tracking
+        connected = t_exec.get('is_connected', t_exec.get('connected', False))
+        skychart = t_exec.get('skychart_online', False)
+        slewing = t_exec.get('is_slewing', t_exec.get('slewing', False))
+        tracking = t_exec.get('is_tracking', t_exec.get('tracking', False))
+        
+        # Color and Text mapping
+        conn_text = 'CONNECTED' if connected else 'DISCONNECTED'
+        conn_color = 'text-[#10B981]' if connected else 'text-red-400 font-bold'
+        hardware_container._ui_elements[f'{t_id}_connected'].set_text(conn_text)
+        hardware_container._ui_elements[f'{t_id}_connected'].classes(replace=f'font-data-mono text-data-mono {conn_color}')
+        
+        sky_text = 'ONLINE' if skychart else 'OFFLINE'
+        sky_color = 'text-[#10B981]' if skychart else 'text-red-400 font-bold'
+        hardware_container._ui_elements[f'{t_id}_skychart'].set_text(sky_text)
+        hardware_container._ui_elements[f'{t_id}_skychart'].classes(replace=f'font-data-mono text-data-mono {sky_color}')
+        
+        slew_text = 'YES' if slewing else 'NO'
+        slew_color = 'text-tertiary font-bold' if slewing else 'text-on-surface-variant'
+        hardware_container._ui_elements[f'{t_id}_slewing'].set_text(slew_text)
+        hardware_container._ui_elements[f'{t_id}_slewing'].classes(replace=f'font-data-mono text-data-mono {slew_color}')
+        
+        track_text = 'ON' if tracking else 'OFF'
+        track_color = 'text-[#10B981]' if tracking else 'text-on-surface-variant'
+        hardware_container._ui_elements[f'{t_id}_tracking'].set_text(track_text)
+        hardware_container._ui_elements[f'{t_id}_tracking'].classes(replace=f'font-data-mono text-data-mono {track_color}')
+            
         if current_obs and raw_state != 'IDLE':
             hardware_container._ui_elements[f'{t_id}_active_target_container'].classes(replace='p-md border border-primary/50 bg-primary/10 rounded flex flex-col items-center justify-center text-center py-xl w-full h-full')
             hardware_container._ui_elements[f'{t_id}_active_icon'].classes(replace='text-primary mb-sm text-3xl')
@@ -169,52 +205,7 @@ def update_hardware_grid(hardware_container, status):
             hardware_container._ui_elements[f'{t_id}_active_icon']._props['name'] = 'inbox'
             hardware_container._ui_elements[f'{t_id}_active_target'].set_text('No active target in queue').classes(replace='text-label-md font-label-md text-on-surface-variant')
             
-        # Update extra telemetry
-        extra_container = hardware_container._ui_elements.get(f'{t_id}_extra_telemetry')
-        if extra_container:
-            keys_to_exclude = {
-                "telescope_id", "running", "queue_size", "current_obs_id", 
-                "current_state", "current_ra", "current_dec", "exposure_start_time", 
-                "exposure_duration", "ra", "dec"
-            }
-            
-            extra_items = []
-            for k, v in t_exec.items():
-                if k in keys_to_exclude:
-                    continue
-                # Map raw keys to user-friendly titles and format values
-                title = k.replace('_', ' ').replace('is ', '').title()
-                if title == 'Connected':
-                    title = 'Telescope Connected'
-                elif title == 'Skychart Online':
-                    title = 'Skychart Connection'
-                elif title == 'Dome Status':
-                    title = 'Dome'
-                
-                extra_items.append((title, v))
-                
-            current_state_str = str(sorted(extra_items, key=lambda x: x[0]))
-            last_state_str = getattr(extra_container, '_last_rendered_state', None)
-            
-            if current_state_str != last_state_str:
-                extra_container.clear()
-                with extra_container:
-                    for title, val in extra_items:
-                        with ui.row().classes('flex justify-between terminal-bg p-xs rounded border border-outline-variant/20 w-full items-center'):
-                            ui.label(f'{title}:').classes('text-label-sm font-label-sm text-on-surface-variant')
-                            
-                            if isinstance(val, bool):
-                                color = 'text-[#10B981]' if val else 'text-red-400 font-bold'
-                                text = 'CONNECTED' if 'Connected' in title or 'Connection' in title else ('ON' if val else 'OFF')
-                                if 'Connection' in title:
-                                    text = 'ONLINE' if val else 'OFFLINE'
-                                ui.label(text).classes(f'font-data-mono text-data-mono {color}')
-                            elif isinstance(val, (int, float)) and ('ra' in title.lower() or 'dec' in title.lower()):
-                                formatted_val = format_ra(val) if 'ra' in title.lower() else format_dec(val)
-                                ui.label(formatted_val).classes('font-data-mono text-data-mono text-primary')
-                            else:
-                                ui.label(str(val).upper()).classes('font-data-mono text-data-mono text-primary')
-                extra_container._last_rendered_state = current_state_str
+
 
         # Update instruments
         for i_id in telescope_to_instruments[t_id]:
