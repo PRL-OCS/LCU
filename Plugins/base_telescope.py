@@ -3,7 +3,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import List
 from pathlib import Path
-from core.communications.schemas import ScheduleSchema
+from core.communications.schemas import ScheduleSchema, Target
 from core.logging_config import logger
 
 class TelescopePlugin(ABC):
@@ -50,13 +50,19 @@ class TelescopePlugin(ABC):
 
     def get_next_observation(self) -> ScheduleSchema | None:
         """
-        Pops and returns the next observation in the queue.
+        Returns the next observation in the queue without removing it.
         """
         if self.observations:
-            obs = self.observations.pop(0)
-            self.save_to_disk()
-            return obs
+            return self.observations[0]
         return None
+
+    def complete_current_observation(self):
+        """
+        Removes the current observation from the queue and saves to disk.
+        """
+        if self.observations:
+            self.observations.pop(0)
+            self.save_to_disk()
 
     @abstractmethod
     async def slew_to_target(self, target: Target):

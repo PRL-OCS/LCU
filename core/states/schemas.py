@@ -26,13 +26,14 @@ class ObservationState(str, Enum):
     STAGING_DATA = "STAGING_DATA"   # Validation/Checksum/Metadata prep
     INGESTING = "INGESTING"     # Pushing to Science Archive
     INGESTED = "INGESTED"       # Archive confirmed storage
-    COMPLETED = "COMPLETED"     # Cleanup done
+    DONE = "DONE"               # Cleanup done
     
     # Terminal/Safety States
     PARKING = "PARKING"
     PARKED = "PARKED"
-    FAILED = "FAILED"
+    ERROR = "ERROR"
     ABORTED = "ABORTED"
+    REJECTED = "REJECTED"
 
 class StateTransition(BaseModel):
     """Record of a state change for audit trails."""
@@ -59,5 +60,5 @@ class ObservationStatus(BaseModel):
         )
         self.transitions.append(transition)
         self.current_state = to_state
-        if to_state in [ObservationState.COMPLETED, ObservationState.FAILED, ObservationState.ABORTED]:
+        if to_state in [ObservationState.DONE, ObservationState.ERROR, ObservationState.ABORTED, ObservationState.REJECTED]:
             self.end_time = datetime.now()

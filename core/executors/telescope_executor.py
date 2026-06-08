@@ -44,11 +44,30 @@ class TelescopeExecutor:
                 now = datetime.datetime.now(datetime.timezone.utc)
                 
                 # --- Gap 9: Dynamic Constraint Validation (Time Expiration) ---
-                if getattr(obs, 'end', None) and obs.end < now:
-                    logger.warning(f"[{self.telescope_id}] Observation {obs.id} time window expired ({obs.end}). Rejecting.")
-                    for config_item in obs.request.configurations:
-                        state_manager.update_observation(f"obs_cfg_{config_item.target.configuration_id}", ObservationState.FAILED, reason="Time window expired")
-                    continue
+                if getattr(obs, 'end', None):
+                    # Estimate required time for this observation
+                    total_exposure_time = 0
+                    for cfg in obs.request.configurations:
+                        if getattr(cfg, 'instrument_configs', None) and getattr(cfg.instrument_configs[0], 'exposure_time', None):
+                            total_exposure_time += float(cfg.instrument_configs[0].exposure_time)
+                    
+                    # Arbitrary overheads are already handled by the Observation Portal.
+                    # We just ensure the raw exposure time still fits within the remaining window.
+                    expected_end = now + datetime.timedelta(seconds=total_exposure_time)
+                    
+                    if expected_end > obs.end:
+                        logger.warning(f"[{self.telescope_id}] Observation {obs.id} requires {total_exposure_time}s exposure but window ends at {obs.end}. Rejecting.")
+                        for config_item in obs.request.configurations:
+                            state_manager.update_observation(
+                                f"config_status_{config_item.configuration_status}", 
+                                ObservationState.REJECTED, 
+                                reason="Insufficient time remaining in window",
+                                pramana_obs_id=obs.id,
+                                pramana_config_id=config_item.configuration_status
+                            )
+                        # Clear from local cache since we are dropping it
+                        getattr(self.telescope_plugin, 'complete_current_observation', lambda: None)()
+                        continue
 
                 if obs.start > now:
                     delay = (obs.start - now).total_seconds()
@@ -59,30 +78,42 @@ class TelescopeExecutor:
                 # when the instrument plugin pops them out of the shared schema list.
                 for config_item in list(obs.request.configurations):
                     target = config_item.target
-                    target.configuration_id = config_item.id
+                    pramana_config_id = getattr(config_item, 'configuration_status', None)
+                    target.configuration_id = pramana_config_id  # Ensure the instrument gets the right ID
 
-                    obs_id = f"obs_cfg_{target.configuration_id}"
+                    obs_id = f"config_status_{pramana_config_id}"
                     self.current_obs_id = obs_id
                     
-                    logger.info(f"[{self.telescope_id}] Processing target for configuration {target.configuration_id}")
-                    state_manager.update_observation(obs_id, ObservationState.PREPARING)
+                    logger.info(f"[{self.telescope_id}] Processing target for configuration status {pramana_config_id}")
+                    state_manager.update_observation(
+                        obs_id, 
+                        ObservationState.PREPARING,
+                        pramana_obs_id=obs.id,
+                        pramana_config_id=pramana_config_id
+                    )
 
                     # Find matching instrument configuration
                     matched_instrument = None
                     matched_config = None
                     
                     for inst_id, inst_plugin in self.plugin_manager.get_all_instrument_plugins().items():
-                        config = inst_plugin.get_configuration(target.configuration_id)
+                        config = inst_plugin.get_configuration(pramana_config_id)
                         if config:
                             matched_instrument = inst_plugin
                             matched_config = config
                             self.active_instrument = inst_plugin
-                            logger.debug(f"[{self.telescope_id}] Found configuration for {target.configuration_id} on {inst_id}")
+                            logger.debug(f"[{self.telescope_id}] Found configuration for {pramana_config_id} on {inst_id}")
                             break
                     
                     if not matched_instrument:
-                        logger.error(f"[{self.telescope_id}] No matching instrument config found for {target.configuration_id}. Aborting.")
-                        state_manager.update_observation(obs_id, ObservationState.ABORTED, reason="Missing instrument configuration")
+                        logger.error(f"[{self.telescope_id}] No matching instrument config found for {pramana_config_id}. Aborting.")
+                        state_manager.update_observation(
+                            obs_id, 
+                            ObservationState.ABORTED, 
+                            reason="Missing instrument configuration",
+                            pramana_obs_id=obs.id,
+                            pramana_config_id=pramana_config_id
+                        )
                         continue
 
                     # --- Gap 9: Dynamic Constraint Validation (Altitude/Safety) ---
@@ -93,29 +124,35 @@ class TelescopeExecutor:
                         current_alt = 45.0 
                         if current_alt < float(min_altitude):
                             logger.error(f"[{self.telescope_id}] Altitude constraint violated ({current_alt} < {min_altitude}). Aborting target.")
-                            state_manager.update_observation(obs_id, ObservationState.FAILED, reason="Constraint violation: min_altitude")
+                            state_manager.update_observation(
+                                obs_id, 
+                                ObservationState.REJECTED, 
+                                reason="Constraint violation: min_altitude",
+                                pramana_obs_id=obs.id,
+                                pramana_config_id=pramana_config_id
+                            )
                             continue
 
                     # SLEWING
                     if self.current_ra != target.ra or self.current_dec != target.dec:
-                        state_manager.update_observation(obs_id, ObservationState.SLEWING)
+                        state_manager.update_observation(obs_id, ObservationState.SLEWING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
                         logger.info(f"[{self.telescope_id}] Slewing to target {target.ra}, {target.dec}...")
                         await self.telescope_plugin.slew_to_target(target)
                         self.current_ra = target.ra
                         self.current_dec = target.dec
                     else:
                         logger.info(f"[{self.telescope_id}] Already pointing at {target.ra}, {target.dec}. Skipping slew.")
-                        state_manager.update_observation(obs_id, ObservationState.SLEWING) # Flash state for continuity
+                        state_manager.update_observation(obs_id, ObservationState.SLEWING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id) # Flash state for continuity
                         
                     await self.telescope_plugin.start_tracking(target)
 
                     # CONFIGURING
-                    state_manager.update_observation(obs_id, ObservationState.CONFIGURING)
+                    state_manager.update_observation(obs_id, ObservationState.CONFIGURING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
                     logger.info(f"[{self.telescope_id}] Configuring instrument {matched_instrument.get_id()}...")
                     await matched_instrument.configure(matched_config)
 
                     # EXPOSING
-                    state_manager.update_observation(obs_id, ObservationState.EXPOSING)
+                    state_manager.update_observation(obs_id, ObservationState.EXPOSING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
                     
                     # Extract exposure time for telemetry
                     exposure_time = 0.0
@@ -133,12 +170,23 @@ class TelescopeExecutor:
                     self.exposure_duration = None
 
                     # READING_OUT
-                    state_manager.update_observation(obs_id, ObservationState.READING_OUT)
+                    state_manager.update_observation(obs_id, ObservationState.READING_OUT, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
                     logger.info(f"[{self.telescope_id}] Reading out...")
                     await asyncio.sleep(1) 
+                    
+                    state_manager.update_observation(
+                        obs_id, 
+                        ObservationState.DONE, 
+                        pramana_obs_id=obs.id, 
+                        pramana_config_id=pramana_config_id,
+                        exposure_time=exposure_time
+                    )
 
                     logger.info(f"[{self.telescope_id}] Execution complete for {obs_id}. Awaiting file detection.")
                     self.current_obs_id = None
+                
+                # All configurations complete for this observation. Now clear from local cache.
+                getattr(self.telescope_plugin, 'complete_current_observation', lambda: None)()
                 
             except asyncio.CancelledError:
                 logger.info(f"[{self.telescope_id}] Task cancelled.")
@@ -155,8 +203,20 @@ class TelescopeExecutor:
             except Exception as e:
                 logger.error(f"[{self.telescope_id}] Error during execution: {e}", exc_info=True)
                 if 'obs_id' in locals():
-                    state_manager.update_observation(obs_id, ObservationState.FAILED, reason=str(e))
+                    # We may not have pramana_obs_id locally if it crashed before config iteration, 
+                    # but usually it crashes inside the config iteration.
+                    p_obs_id = locals().get('obs', type('obj', (object,), {'id': None})).id
+                    p_config_id = locals().get('pramana_config_id', None)
+                    state_manager.update_observation(
+                        obs_id, 
+                        ObservationState.ERROR, 
+                        reason=str(e),
+                        pramana_obs_id=p_obs_id,
+                        pramana_config_id=p_config_id
+                    )
                 self.current_obs_id = None
+                # Clear from cache so we don't get stuck in a crash loop with a bad target
+                getattr(self.telescope_plugin, 'complete_current_observation', lambda: None)()
                 await asyncio.sleep(2)
 
     def start(self):

@@ -1,7 +1,9 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import asyncio
 from .schemas import LCUState, ObservationState, ObservationStatus
 from core.logging_config import logger
+from .uplink import uplink_manager
 
 class StateManager:
     """
@@ -23,7 +25,9 @@ class StateManager:
         self.system_state = new_state
         self.last_update = datetime.now()
 
-    def update_observation(self, obs_id: str, new_state: ObservationState, reason: Optional[str] = None):
+    def update_observation(self, obs_id: str, new_state: ObservationState, reason: Optional[str] = None,
+                           pramana_obs_id: Optional[int] = None, pramana_config_id: Optional[int] = None,
+                           exposure_time: float = 0.0):
         """
         Transitions an observation to a new state.
         Allocates new status tracking if not already present.
@@ -35,7 +39,7 @@ class StateManager:
         status = self.observations[obs_id]
         
         # Validation: check for illegal jumps or re-entry into terminal states
-        if status.current_state in [ObservationState.COMPLETED, ObservationState.FAILED, ObservationState.ABORTED]:
+        if status.current_state in [ObservationState.DONE, ObservationState.ERROR, ObservationState.ABORTED, ObservationState.REJECTED]:
             if new_state != status.current_state:
                 logger.warning(f"Blocked attempt to transition {obs_id} out of terminal state {status.current_state.value}")
                 return
@@ -46,6 +50,16 @@ class StateManager:
         logger.info(f"Observation {obs_id}: {status.current_state.value} -> {new_state.value}")
         status.add_transition(new_state, reason=reason)
         self.last_update = datetime.now()
+
+        # Enqueue state uplink to PRAMANA if IDs are provided
+        try:
+            loop = asyncio.get_running_loop()
+            if pramana_config_id is not None:
+                loop.create_task(uplink_manager.enqueue_configuration_status(
+                    pramana_config_id, new_state.name, reason or "", exposure_time=exposure_time
+                ))
+        except RuntimeError:
+            pass # No running loop, cannot enqueue
 
     def get_observation_status(self, obs_id: str) -> Optional[ObservationStatus]:
         """Retrieves raw status for a specific observation."""
@@ -60,7 +74,7 @@ class StateManager:
             "active_observations": {
                 id: obs.current_state.value 
                 for id, obs in self.observations.items() 
-                if obs.current_state not in [ObservationState.COMPLETED, ObservationState.FAILED, ObservationState.ABORTED]
+                if obs.current_state not in [ObservationState.DONE, ObservationState.ERROR, ObservationState.ABORTED, ObservationState.REJECTED]
             }
         }
 

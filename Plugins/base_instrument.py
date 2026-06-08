@@ -53,14 +53,14 @@ class InstrumentPlugin(ABC):
                 return obs
         return None
 
-    def get_configuration(self, config_id: int) -> Configuration | None:
+    def get_configuration(self, config_status_id: int) -> Configuration | None:
         """
         Returns the matching configuration and REMOVES it from the observation queue.
         This allows the executor to process the config while keeping the UI queue in sync.
         """
         for i, obs in enumerate(self.observations):
             for j, config in enumerate(obs.request.configurations):
-                if config.id == config_id:
+                if getattr(config, 'configuration_status', None) == config_status_id:
                     matched_config = obs.request.configurations.pop(j)
                     # If this was the last config in the observation, pop the observation
                     if len(obs.request.configurations) == 0:

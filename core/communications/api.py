@@ -92,6 +92,29 @@ def fetch_my_pending_tasks(my_telescope_id: str) -> List[ScheduleSchema]:
         logger.error(f"System failure: {e}", exc_info=True)
         return []
 
+def push_configuration_status(config_status_id: int, payload: dict):
+    """
+    Pushes configuration status/telemetry to the PRAMANA backend.
+    """
+    if not API_TOKEN:
+        logger.error("Cannot push config status: API token missing.")
+        return False
+
+    url = f"{PORTAL_API_URL}api/configurationstatus/{config_status_id}/"
+    headers = {
+        "Authorization": f"Token {API_TOKEN}", 
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.patch(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()
+        logger.debug(f"Pushed config status {config_status_id} with payload keys {list(payload.keys())}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to push config status {config_status_id}: {e}")
+        return False
+
 if __name__ == "__main__":
     try:
         # Execute test fetch

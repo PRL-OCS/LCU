@@ -32,6 +32,30 @@ class ScheduleCoordinator:
                 if not task.request.configurations:
                     continue
 
+                if getattr(task.request, 'state', '').upper() != "PENDING":
+                    logger.warning(f"Task {task.id} skipped: state is {task.request.state}, not PENDING.")
+                    continue
+
+                # Filter configurations that are already in a terminal state
+                from core.states.manager import state_manager
+                from core.states.schemas import ObservationState
+                
+                active_configs = []
+                for config in task.request.configurations:
+                    pramana_config_id = getattr(config, 'configuration_status', None)
+                    obs_id = f"config_status_{pramana_config_id}"
+                    
+                    if obs_id in state_manager.observations:
+                        status = state_manager.observations[obs_id]
+                        if status.current_state in [ObservationState.DONE, ObservationState.ERROR, ObservationState.ABORTED, ObservationState.REJECTED]:
+                            continue # Skip this configuration as it's already finished
+                    
+                    active_configs.append(config)
+                
+                task.request.configurations = active_configs
+                if not task.request.configurations:
+                    continue # Skip the entire task if all configurations are completed
+
                 t_id = task.telescope
                 # We use the 'instrument_type' from the first configuration to identify the required instrument
                 i_name = task.request.configurations[0].instrument_type

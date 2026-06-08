@@ -133,6 +133,8 @@ def update_hardware_grid(hardware_container, status):
         t_state = raw_state
         if raw_state in ['CONFIGURING', 'EXPOSING', 'READING_OUT']:
             t_state = 'TRACKING'
+        elif raw_state == 'DONE':
+            t_state = 'IDLE'
             
         t_color = 'text-primary' if is_running and t_state != 'IDLE' else 'text-on-surface'
         t_indicator = 'bg-primary' if is_running and t_state != 'IDLE' else 'bg-secondary-fixed'
@@ -192,7 +194,7 @@ def update_hardware_grid(hardware_container, status):
                     hardware_container._ui_elements[f'{i_id}_prog_container'].style('display: none')
                     
                 i_status = i_plugins.get(i_id, {})
-                q_items = getattr(i_plugins.get(i_id, object()), 'observations', [])
+                q_items = i_status.get('queued_items', [])
                 q_size = i_status.get('queue_size', 0)
                 if q_size > 0:
                     hardware_container._ui_elements[f'{i_id}_queue_container'].style('display: block')

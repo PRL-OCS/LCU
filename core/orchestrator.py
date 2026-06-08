@@ -46,10 +46,13 @@ class LCUOrchestrator:
         """
         Starts the automated background loops.
         """
+        from core.states.uplink import uplink_manager
+        
         if self._sync_task is None:
             logger.info("Starting background scheduler...")
             self._sync_task = asyncio.create_task(self._periodic_sync_loop())
             asyncio.create_task(self.watchdog.run_forever())
+            asyncio.create_task(uplink_manager.start())
 
     async def _periodic_sync_loop(self):
         """

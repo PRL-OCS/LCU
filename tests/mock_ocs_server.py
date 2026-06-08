@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 app = FastAPI(title="Mock Observation Portal - Multi-Telescope Test")
 
 CURRENT_MODE = "default"
+global_counter = 1000
+global_obs_counter = 1
 
 @app.get("/api/instruments/")
 def get_instruments():
@@ -47,6 +49,8 @@ base_config = {
 
 @app.get("/api/schedule/")
 def get_schedule():
+    global global_counter
+    global global_obs_counter
     
     now = datetime.now(timezone.utc)
     
@@ -57,9 +61,9 @@ def get_schedule():
     t100_end = now + timedelta(seconds=60)
     
     t100_obs = {
-        "id": 1,
+        "id": global_obs_counter,
         "request": {
-            "id": 101,
+            "id": global_obs_counter * 100,
             "observation_note": "T100 Multi-Exposure",
             "state": "PENDING",
             "acceptability_threshold": 90.0,
@@ -88,7 +92,9 @@ def get_schedule():
         # Add 3 configurations with completely different targets to force slewing
         for i in range(3):
             cfg = copy.deepcopy(base_config)
-            cfg["id"] = 1000 + i
+            cfg["id"] = global_counter
+            cfg["configuration_status"] = global_counter
+            global_counter += 1
             cfg["instrument_configs"][0]["exposure_time"] = 4.0
             cfg["target"]["name"] = f"SlewTarget-{i}"
             cfg["target"]["ra"] = 88.792 + (i * 25.0)
@@ -98,7 +104,9 @@ def get_schedule():
         # Add 3 configurations (exposures) for T100 on the SAME target
         for i in range(3):
             cfg = copy.deepcopy(base_config)
-            cfg["id"] = 1000 + i
+            cfg["id"] = global_counter
+            cfg["configuration_status"] = global_counter
+            global_counter += 1
             cfg["instrument_configs"][0]["exposure_time"] = 10.0 + (i * 5) # 10s, 15s, 20s
             t100_obs["request"]["configurations"].append(cfg)
 
@@ -109,9 +117,9 @@ def get_schedule():
     t200_end = t200_start + timedelta(seconds=60)
     
     t200_obs = {
-        "id": 2,
+        "id": global_obs_counter + 1,
         "request": {
-            "id": 201,
+            "id": (global_obs_counter + 1) * 100,
             "observation_note": "T200 Multi-Exposure",
             "state": "PENDING",
             "acceptability_threshold": 90.0,
@@ -139,16 +147,49 @@ def get_schedule():
     # Add 2 configurations (exposures) for T200
     for i in range(2):
         cfg = copy.deepcopy(base_config)
-        cfg["id"] = 2000 + i
+        cfg["id"] = global_counter
+        cfg["configuration_status"] = global_counter
+        global_counter += 1
         cfg["instrument_type"] = "T200_CAM"
         cfg["instrument_name"] = "T200_CAM"
         cfg["target"]["name"] = "Target-Beta"
         cfg["instrument_configs"][0]["exposure_time"] = 12.0 # 12s each
         t200_obs["request"]["configurations"].append(cfg)
 
+    global_obs_counter += 2
+
     return {
         "results": [t100_obs, t200_obs]
     }
+
+@app.patch("/api/observations/{obs_id}/")
+def patch_observation(obs_id: int, payload: dict):
+    print(f"[MOCK PRAMANA] Observation {obs_id} state updated to: {payload.get('state')}")
+    return {"status": "success", "id": obs_id, "state": payload.get('state')}
+
+@app.patch("/api/configurationstatus/{config_id}/")
+def patch_configuration_status(config_id: int, payload: dict):
+    # Print the payload formatted for easy debugging
+    main_state = payload.get("state", "NO_CHANGE")
+    summary = payload.get("summary", {})
+    summary_state = summary.get("state", "NO_CHANGE")
+    events = summary.get("events", [])
+    
+    start_time = summary.get("start", "N/A")
+    end_time = summary.get("end", "N/A")
+    time_completed = summary.get("time_completed", 0.0)
+    
+    print(f"\n[MOCK PRAMANA] ConfigStatus {config_id} PATCH Received:")
+    print(f"  --> Main State: {main_state}")
+    print(f"  --> Summary State: {summary_state}")
+    print(f"  --> Start Time: {start_time}")
+    print(f"  --> End Time: {end_time}")
+    print(f"  --> Exposure Time Completed: {time_completed}s")
+    print(f"  --> Timeline Events: {len(events)}")
+    for e in events:
+        print(f"      - {e.get('state')} @ {e.get('timestamp')}")
+    print()
+    return {"status": "success"}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Mock OCS Server")
