@@ -133,13 +133,27 @@ class TelescopeExecutor:
                             )
                             continue
 
+                    # Update executor coordinates from plugin telemetry
+                    try:
+                        self.telescope_plugin.get_current_telemetry()
+                    except Exception:
+                        pass
+                    self.current_ra = getattr(self.telescope_plugin, 'current_ra', self.current_ra)
+                    self.current_dec = getattr(self.telescope_plugin, 'current_dec', self.current_dec)
+
                     # SLEWING
                     if self.current_ra != target.ra or self.current_dec != target.dec:
                         state_manager.update_observation(obs_id, ObservationState.SLEWING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
                         logger.info(f"[{self.telescope_id}] Slewing to target {target.ra}, {target.dec}...")
                         await self.telescope_plugin.slew_to_target(target)
-                        self.current_ra = target.ra
-                        self.current_dec = target.dec
+                        
+                        # Sync coordinates post-slew
+                        try:
+                            self.telescope_plugin.get_current_telemetry()
+                        except Exception:
+                            pass
+                        self.current_ra = getattr(self.telescope_plugin, 'current_ra', self.current_ra)
+                        self.current_dec = getattr(self.telescope_plugin, 'current_dec', self.current_dec)
                     else:
                         logger.info(f"[{self.telescope_id}] Already pointing at {target.ra}, {target.dec}. Skipping slew.")
                         state_manager.update_observation(obs_id, ObservationState.SLEWING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id) # Flash state for continuity
@@ -246,7 +260,14 @@ class TelescopeExecutor:
             if status_obj:
                 current_state = status_obj.current_state.value
                 
-        return {
+        # Query telemetry to update coordinates on the plugin
+        telemetry = {}
+        try:
+            telemetry = self.telescope_plugin.get_current_telemetry()
+        except Exception as e:
+            pass
+
+        status_dict = {
             "telescope_id": self.telescope_plugin.get_id(),
             "running": self._running,
             "queue_size": len(getattr(self.telescope_plugin, 'observations', [])),
@@ -257,3 +278,11 @@ class TelescopeExecutor:
             "exposure_start_time": self.exposure_start_time,
             "exposure_duration": self.exposure_duration
         }
+
+        # Merge additional telemetry keys from the plugin
+        if isinstance(telemetry, dict):
+            for k, v in telemetry.items():
+                if k not in status_dict:
+                    status_dict[k] = v
+
+        return status_dict
