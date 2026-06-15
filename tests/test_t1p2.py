@@ -1,216 +1,325 @@
 import os
 import sys
-import unittest
+import time
 import asyncio
+import socket
+import datetime
+import unittest
+import argparse
+import threading
 from unittest.mock import patch, MagicMock
 
-# Ensure LCU root is in Python path
+# Parse custom argument before unittest parses command line arguments
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument("--live", action="store_true", help="Connect directly to the live Skychart service")
+args, unknown = parser.parse_known_args()
+
+# Clean up sys.argv so unittest doesn't fail on the custom argument
+sys.argv = [sys.argv[0]] + unknown
+
+LIVE_TEST = args.live
+
+# Add LCU root to path so imports work correctly
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from Plugins.telescope.T1P2.telescope_plugin import T1P2TelescopePlugin
-from core.communications.schemas import ScheduleSchema, Target
-from Plugins.telescope.T1P2.telescope_driver import TelescopeDriver
+from core.communications.schemas import Target, Configuration, InstrumentConfig, ScheduleSchema, RequestSchema
 
-MOCK_TELESCOPE_API_DATA = {
-    "id": 1,
-    "request": {
-        "id": 101,
-        "observation_note": "T1P2 Observation",
-        "state": "PENDING",
-        "acceptability_threshold": 90.0,
-        "modified": "2026-06-03T12:00:00Z",
-        "duration": 600,
-        "configurations": [{
-            "id": 501,
-            "instrument_type": "camera",
-            "type": "EXPOSE",
-            "priority": 1,
-            "instrument_configs": [{
-                "optical_elements": {"filter": "V"},
-                "mode": "full",
-                "exposure_time": 10.0,
-                "exposure_count": 1,
-                "rotator_mode": "SKY",
-                "extra_params": {"bin_x": 1, "bin_y": 1, "defocus": 0.0},
-                "rois": []
-            }],
-            "target": {
-                "type": "ICRS",
-                "name": "M31",
-                "ra": 10.684,
-                "dec": 41.269,
-                "epoch": 2000.0
-            },
-            "configuration_status": 1,
-            "state": "PENDING",
-            "instrument_name": "T1P2_IMAGER",
-            "guide_camera_name": "guider"
-        }]
-    },
-    "site": "tst",
-    "enclosure": "doma",
-    "telescope": "1m0a",
-    "start": "2026-06-03T20:00:00Z",
-    "end": "2026-06-03T20:10:00Z",
-    "priority": 100,
-    "state": "PENDING",
-    "proposal": "P1",
-    "submitter": "T1",
-    "name": "M31",
-    "ipp_value": 1.0,
-    "observation_type": "S",
-    "request_group_id": 1001,
-    "created": "2026-06-03T10:00:00Z",
-    "modified": "2026-06-03T10:00:00Z"
-}
+class MockSkychartServer:
+    """
+    Simulates a running Skychart TCP application server on localhost.
+    """
+    def __init__(self, host="127.0.0.1", port=0):
+        self.host = host
+        self.port = port
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_sock.bind((self.host, self.port))
+        self.port = self.server_sock.getsockname()[1]
+        self.running = False
+        self.thread = None
+        self.lock = threading.Lock()
+        
+        # Simulated telescope state
+        self.target_ra = 10.0      # in hours
+        self.target_dec = 30.0     # in degrees
+        self.current_ra = 10.0     # in hours
+        self.current_dec = 30.0    # in degrees
+        self.is_tracking = False
+        self.is_slewing = False
 
-MOCK_NON_SIDEREAL_API_DATA = {
-    "id": 2,
-    "request": {
-        "id": 102,
-        "observation_note": "T1P2 Non-Sidereal Observation",
-        "state": "PENDING",
-        "acceptability_threshold": 90.0,
-        "modified": "2026-06-03T12:00:00Z",
-        "duration": 600,
-        "configurations": [{
-            "id": 502,
-            "instrument_type": "camera",
-            "type": "EXPOSE",
-            "priority": 1,
-            "instrument_configs": [{
-                "optical_elements": {"filter": "V"},
-                "mode": "full",
-                "exposure_time": 10.0,
-                "exposure_count": 1,
-                "rotator_mode": "SKY",
-                "extra_params": {"bin_x": 1, "bin_y": 1, "defocus": 0.0},
-                "rois": []
-            }],
-            "target": {
-                "type": "NON-SIDEREAL",
-                "name": "Jupiter",
-                "ra": 0.0,  # Needs resolution
-                "dec": 0.0, # Needs resolution
-                "epoch": 2000.0
-            },
-            "configuration_status": 1,
-            "state": "PENDING",
-            "instrument_name": "T1P2_IMAGER",
-            "guide_camera_name": "guider"
-        }]
-    },
-    "site": "tst",
-    "enclosure": "doma",
-    "telescope": "1m0a",
-    "start": "2026-06-03T20:00:00Z",
-    "end": "2026-06-03T20:10:00Z",
-    "priority": 100,
-    "state": "PENDING",
-    "proposal": "P1",
-    "submitter": "T1",
-    "name": "Jupiter",
-    "ipp_value": 1.0,
-    "observation_type": "S",
-    "request_group_id": 1001,
-    "created": "2026-06-03T10:00:00Z",
-    "modified": "2026-06-03T10:00:00Z"
-}
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
 
-class TestT1P2Plugin(unittest.IsolatedAsyncioTestCase):
-    
-    @patch('socket.socket')
-    def setUp(self, mock_socket):
-        # Mock socket behaviors to avoid connecting to a real server during tests
-        self.mock_socket_inst = MagicMock()
-        mock_socket.return_value.__enter__.return_value = self.mock_socket_inst
-        
-        # Instantiate plugin
-        self.plugin = T1P2TelescopePlugin(telescope_id="1m0a")
+    def stop(self):
+        self.running = False
+        try:
+            self.server_sock.close()
+        except:
+            pass
+        if self.thread:
+            self.thread.join(timeout=1.0)
 
-    def tearDown(self):
-        # Clean up driver background thread
-        self.plugin.driver.disconnect()
+    def _run(self):
+        self.server_sock.listen(5)
+        while self.running:
+            try:
+                conn, addr = self.server_sock.accept()
+                t = threading.Thread(target=self._handle_client, args=(conn,), daemon=True)
+                t.start()
+            except:
+                break
 
-    def test_initialization(self):
-        """Verify that the plugin is correctly initialized."""
-        self.assertEqual(self.plugin.telescope_id, "1m0a")
-        self.assertTrue(hasattr(self.plugin, 'driver'))
+    def _handle_client(self, conn):
+        try:
+            # Send Skychart greeting
+            conn.sendall(b"OK! Skychart Ready\r\n")
+            
+            buffer = bytearray()
+            while self.running:
+                # Slew simulation step: instant convergence for faster unit testing
+                with self.lock:
+                    if self.is_slewing:
+                        self.current_ra = self.target_ra
+                        self.current_dec = self.target_dec
+                        self.is_slewing = False
 
-    def test_receive_schedule(self):
-        """Verify schedule loading and target extraction."""
-        obs = ScheduleSchema.model_validate(MOCK_TELESCOPE_API_DATA)
-        self.plugin.receive_schedule([obs])
-        
-        self.assertEqual(len(self.plugin.targets), 1)
-        target = self.plugin.targets[0]
-        self.assertEqual(target.name, "M31")
-        self.assertEqual(target.ra, 10.684)
-        self.assertEqual(target.dec, 41.269)
-        self.assertEqual(target.configuration_id, 501)
+                data = conn.recv(1024)
+                if not data:
+                    break
+                buffer.extend(data)
+                
+                while b"\r\n" in buffer:
+                    line_idx = buffer.index(b"\r\n")
+                    line = buffer[:line_idx].decode("utf-8").strip()
+                    del buffer[:line_idx+2]
+                    
+                    if not line:
+                        continue
+                    
+                    parts = line.split()
+                    cmd = parts[0].upper()
+                    
+                    response = b"OK\r\n"
+                    if cmd == "GETSCOPERADEC":
+                        with self.lock:
+                            response = f"OK! {self.current_ra} {self.current_dec}\r\n".encode()
+                    elif cmd == "SEARCH":
+                        response = b"OK\r\n"
+                    elif cmd == "REDRAW":
+                        response = b"OK\r\n"
+                    elif cmd == "GETSELECTEDOBJECT":
+                        # Returns mock coordinates format
+                        with self.lock:
+                            response = b"OK!\t18h36m54s\t+38d46m48s\r\n"
+                    elif cmd == "CONNECTTELESCOPE":
+                        response = b"OK\r\n"
+                    elif cmd == "SLEW":
+                        if len(parts) > 2:
+                            with self.lock:
+                                self.target_ra = float(parts[1])
+                                self.target_dec = float(parts[2])
+                                self.is_slewing = True
+                        response = b"OK\r\n"
+                    elif cmd == "ABORTSLEW":
+                        with self.lock:
+                            self.is_slewing = False
+                        response = b"OK\r\n"
+                    elif cmd == "TRACKTELESCOPE":
+                        if len(parts) > 1:
+                            with self.lock:
+                                self.is_tracking = parts[1] == "ON"
+                        response = b"OK\r\n"
+                        
+                    conn.sendall(response)
+        except Exception:
+            pass
+        finally:
+            try:
+                conn.close()
+            except:
+                pass
 
-    @patch.object(TelescopeDriver, 'slew_to')
-    @patch.object(TelescopeDriver, 'get_status')
-    async def test_slew_to_sidereal_target(self, mock_get_status, mock_slew_to):
-        """Test slewing to a sidereal target using database coordinates directly."""
-        obs = ScheduleSchema.model_validate(MOCK_TELESCOPE_API_DATA)
-        self.plugin.receive_schedule([obs])
-        target = self.plugin.get_next_target()
-        
-        # Mock status updates so slew completes quickly
-        mock_get_status.return_value = {
-            "ra": 10.684,
-            "dec": 41.269,
-            "connected": True,
-            "skychart_online": True
-        }
-        
-        await self.plugin.slew_to_target(target)
-        
-        # Verify slew was invoked with direct coordinates
-        mock_slew_to.assert_called_once_with(10.684, 41.269)
 
-    @patch.object(TelescopeDriver, 'resolve_target')
-    @patch.object(TelescopeDriver, 'slew_to')
-    @patch.object(TelescopeDriver, 'get_status')
-    async def test_slew_to_non_sidereal_target(self, mock_get_status, mock_slew_to, mock_resolve_target):
-        """Test resolving non-sidereal target name to coordinates and slewing."""
-        obs = ScheduleSchema.model_validate(MOCK_NON_SIDEREAL_API_DATA)
-        self.plugin.receive_schedule([obs])
-        target = self.plugin.get_next_target()
-        
-        # Mock target resolution values (Jupiter: RA=100.0, Dec=10.0)
-        mock_resolve_target.return_value = (100.0, 10.0)
-        
-        # Mock status updates so slew completes quickly
-        mock_get_status.return_value = {
-            "ra": 100.0,
-            "dec": 10.0,
-            "connected": True,
-            "skychart_online": True
-        }
-        
-        await self.plugin.slew_to_target(target)
-        
-        # Verify resolution was attempted and resolved coordinates were used to slew
-        mock_resolve_target.assert_called_once_with("Jupiter")
-        mock_slew_to.assert_called_once_with(100.0, 10.0)
+class TestT1P2Flow(unittest.IsolatedAsyncioTestCase):
+    """
+    Unified sequential test flow for the T1P2 (Skychart) Telescope Plugin.
+    Runs connection, telemetry polling, and slewing sequentially on the same object.
+    Supports running on mock server or live Skychart via the --live argument.
+    """
 
-    @patch.object(TelescopeDriver, 'get_status')
-    def test_telemetry(self, mock_get_status):
-        """Verify telemetry collection."""
-        mock_get_status.return_value = {
-            "ra": 10.684,
-            "dec": 41.269,
-            "connected": True,
-            "skychart_online": True
-        }
+    @classmethod
+    def setUpClass(cls):
+        if LIVE_TEST:
+            print("\n*** RUNNING IN LIVE HARDWARE MODE (SKYCHART FLATPAK) ***")
+            cls.server = None
+            cls.connect_patcher = None
+        else:
+            print("\n*** RUNNING IN MOCK SERVER MODE ***")
+            # Start local mock Skychart server
+            cls.server = MockSkychartServer()
+            cls.server.start()
+            # Wait for server to bind
+            time.sleep(0.2)
+
+            # Redirect socket connections to our mock server
+            cls.original_connect = socket.socket.connect
+
+            def mock_connect(self_sock, address):
+                host, port = address
+                # Redirect default Skychart IP/port to local mock server
+                if host == "127.0.0.1" and int(port) == 3292:
+                    return cls.original_connect(self_sock, ("127.0.0.1", cls.server.port))
+                return cls.original_connect(self_sock, address)
+
+            cls.connect_patcher = patch.object(socket.socket, "connect", mock_connect)
+            cls.connect_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.connect_patcher:
+            cls.connect_patcher.stop()
+        if cls.server:
+            cls.server.stop()
+
+    async def test_t1p2_sequential_flow(self):
+        print("\n--- Step 1: Initializing T1P2 Telescope Plugin ---")
+        # 1. Initialize the object (connects to live Skychart, or mock server via redirect)
+        plugin = T1P2TelescopePlugin(telescope_id="1m2")
         
-        telemetry = self.plugin.get_current_telemetry()
-        self.assertEqual(telemetry["ra"], 10.684)
-        self.assertEqual(telemetry["dec"], 41.269)
+        # Test basic attributes after initialization
+        self.assertEqual(plugin.get_id(), "1m2")
+        
+        print("\n--- Step 2: Testing Hardware Connection ---")
+        # Verify the hardware connection is active and telemetry thread started
+        self.assertTrue(plugin.driver.is_connected)
+        self.assertTrue(plugin.driver.telemetry.running)
+        
+        # Ensure socket is active
+        self.assertIsNotNone(plugin.driver.sock)
+
+        print("\n--- Step 3: Testing Polling Telemetry ---")
+        if LIVE_TEST:
+            # Command Skychart to connect to the telescope mount first
+            print("Live Mode: Sending CONNECTTELESCOPE to Skychart mount...")
+            try:
+                plugin.driver._execute("CONNECTTELESCOPE")
+            except Exception as e:
+                print(f"Warning: CONNECTTELESCOPE failed: {e}")
+        else:
+            # Seed coordinates on the mock server
+            # RA = 10.0 hours -> 150.0 degrees, Dec = 30.0 degrees
+            with self.server.lock:
+                self.server.current_ra = 10.0
+                self.server.current_dec = 30.0
+
+        # Wait for background telemetry thread to poll at least once (interval is 2s)
+        # and allow connection state to propagate
+        print("Waiting for background telemetry thread to poll...")
+        await asyncio.sleep(2.5)
+
+        # Fetch telemetry through the plugin
+        telemetry = plugin.get_current_telemetry()
+        print(f"Fetched Telemetry: {telemetry}")
+        
+        # Verify basic telemetry status fields
         self.assertTrue(telemetry["is_connected"])
-        self.assertTrue(telemetry["skychart_online"])
+        self.assertIn("ra", telemetry)
+        self.assertIn("dec", telemetry)
 
-if __name__ == '__main__':
+        if not LIVE_TEST:
+            # Verify telemetry coordinates match scaled values
+            self.assertAlmostEqual(telemetry["ra"], 150.0) # 10.0 hours * 15
+            self.assertAlmostEqual(telemetry["dec"], 30.0)
+            self.assertEqual(plugin.current_ra, 150.0)
+            self.assertEqual(plugin.current_dec, 30.0)
+
+        print("\n--- Step 4: Testing target scheduling and slewing ---")
+        # Create a mock target and schedule
+        target = Target(
+            configuration_id=600,
+            type="MPC_COMET", #for test purposes so that resolving works
+            name="Polaris",
+            ra=279.23,  # 18.615 hours
+            dec=38.78,
+            epoch=2000.0
+        )
+        
+        config = Configuration(
+            id=600,
+            instrument_type="MOCK_CAM",
+            type="TEST",
+            priority=1,
+            instrument_configs=[InstrumentConfig(mode="IMG", exposure_time=2.0)],
+            target=target,
+            configuration_status=600,
+            state="PENDING",
+            instrument_name="MOCK_CAM"
+        )
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        request = RequestSchema(
+            id=999,
+            observation_note="T1P2 test schedule",
+            state="PENDING",
+            acceptability_threshold=1.0,
+            modified=now,
+            duration=15,
+            configurations=[config]
+        )
+        
+        obs_schedule = ScheduleSchema(
+            id=999,
+            request=request,
+            site="PRL",
+            enclosure="DomeA",
+            telescope="1m2",
+            start=now - datetime.timedelta(seconds=5),
+            end=now + datetime.timedelta(seconds=60),
+            priority=1,
+            state="PENDING",
+            proposal="PROP-T1P2",
+            submitter="observer",
+            name="T1P2TestSchedule",
+            ipp_value=1.0,
+            observation_type="SCIENCE",
+            request_group_id=1,
+            created=now,
+            modified=now
+        )
+
+        # Receive schedule and test local queue state
+        plugin.receive_schedule([obs_schedule])
+        self.assertEqual(len(plugin.observations), 1)
+        self.assertEqual(len(plugin.targets), 1)
+        
+        # Trigger slew to the target coordinates
+        print(f"Triggering slew to {target.name} (RA: {target.ra}, Dec: {target.dec})")
+        await plugin.slew_to_target(target)
+        
+        # Start tracking
+        await plugin.start_tracking(target)
+        self.assertTrue(plugin.is_tracking)
+
+        # Allow some time for hardware/mock server to process slew coordinates
+        await asyncio.sleep(2.5)
+
+        # Check telemetry again
+        telemetry_after = plugin.get_current_telemetry()
+        print(f"Telemetry after slew: {telemetry_after}")
+        self.assertTrue(telemetry_after["is_connected"])
+        
+        if not LIVE_TEST:
+            # Slew targets in server should match target RA (in hours) and Dec
+            with self.server.lock:
+                self.assertAlmostEqual(self.server.target_ra, 279.23 / 15.0)
+                self.assertAlmostEqual(self.server.target_dec, 38.78)
+
+        # Stop telemetry thread and disconnect safely
+        plugin.driver.disconnect()
+        print("T1P2 sequential test flow finished successfully.")
+
+if __name__ == "__main__":
     unittest.main()

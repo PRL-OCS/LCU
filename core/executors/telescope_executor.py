@@ -251,6 +251,20 @@ class TelescopeExecutor:
         self._running = False
         if self._task:
             self._task.cancel()
+        if self._telemetry_task:
+            self._telemetry_task.cancel()
+
+    async def _telemetry_loop(self):
+        logger.info(f"Started telemetry loop for telescope: {self.telescope_id}")
+        while self._running:
+            try:
+                # Query get_current_telemetry in a separate thread to not block main loop
+                await asyncio.get_event_loop().run_in_executor(
+                    None, self.telescope_plugin.get_current_telemetry
+                )
+            except Exception as e:
+                logger.error(f"[{self.telescope_id}] Telemetry loop error: {e}")
+            await asyncio.sleep(0.2)
 
     def get_status(self):
         # Find the state of the current observation from the state manager

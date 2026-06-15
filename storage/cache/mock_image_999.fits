@@ -1,4 +1,0 @@
-SIMPLE  =                    T / file does conform to FITS standard
-BITPIX  =                   16 / number of bits per data pixel
-NAXIS   =                    2 / number of data axes
-END

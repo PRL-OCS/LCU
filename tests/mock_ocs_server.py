@@ -13,13 +13,13 @@ global_obs_counter = 1
 @app.get("/api/instruments/")
 def get_instruments():
     return {
-        "MOCK_CAM": {
-            "class": "T100",
-            "name": "MOCK_CAM"
+        "LISA": {
+            "class": "1m2",
+            "name": "LISA"
         },
-        "T200_CAM": {
-            "class": "T200",
-            "name": "T200_CAM"
+        "T2P5_CAM": {
+            "class": "T2P5",
+            "name": "T2P5_CAM"
         }
     }
 
@@ -55,16 +55,16 @@ def get_schedule():
     now = datetime.now(timezone.utc)
     
     # ----------------------------------------
-    # T100 Observation (Multiple Exposures)
+    # 1m2 Observation 1: M43 (Sidereal)
     # ----------------------------------------
-    t100_start = now
-    t100_end = now + timedelta(seconds=60)
+    obs1_start = now + timedelta(seconds=2)
+    obs1_end = obs1_start + timedelta(seconds=25)
     
-    t100_obs = {
+    obs1 = {
         "id": global_obs_counter,
         "request": {
             "id": global_obs_counter * 100,
-            "observation_note": "T100 Multi-Exposure",
+            "observation_note": "1m2 Observation 1 - M43",
             "state": "PENDING",
             "acceptability_threshold": 90.0,
             "modified": now.isoformat(),
@@ -72,55 +72,47 @@ def get_schedule():
             "configurations": []
         },
         "site": "PRL",
-        "enclosure": "DomeA",
-        "telescope": "T100",
-        "start": t100_start.isoformat(),
-        "end": t100_end.isoformat(),
+        "enclosure": "DomeC",
+        "telescope": "1m2",
+        "start": obs1_start.isoformat(),
+        "end": obs1_end.isoformat(),
         "priority": 1,
         "state": "PENDING",
-        "proposal": "PROP-01",
+        "proposal": "PROP-03",
         "submitter": "astronomer",
-        "name": "T100 Test Obs",
+        "name": "M43 Obs",
         "ipp_value": 1.0,
         "observation_type": "NORMAL",
-        "request_group_id": 1,
+        "request_group_id": 3,
         "created": now.isoformat(),
         "modified": now.isoformat()
     }
-    
-    if CURRENT_MODE == "slewing":
-        # Add 3 configurations with completely different targets to force slewing
-        for i in range(3):
-            cfg = copy.deepcopy(base_config)
-            cfg["id"] = global_counter
-            cfg["configuration_status"] = global_counter
-            global_counter += 1
-            cfg["instrument_configs"][0]["exposure_time"] = 4.0
-            cfg["target"]["name"] = f"SlewTarget-{i}"
-            cfg["target"]["ra"] = 88.792 + (i * 25.0)
-            cfg["target"]["dec"] = 7.407 - (i * 15.0)
-            t100_obs["request"]["configurations"].append(cfg)
-    else:
-        # Add 3 configurations (exposures) for T100 on the SAME target
-        for i in range(3):
-            cfg = copy.deepcopy(base_config)
-            cfg["id"] = global_counter
-            cfg["configuration_status"] = global_counter
-            global_counter += 1
-            cfg["instrument_configs"][0]["exposure_time"] = 10.0 + (i * 5) # 10s, 15s, 20s
-            t100_obs["request"]["configurations"].append(cfg)
+
+    # Add configuration for M43
+    cfg1 = copy.deepcopy(base_config)
+    cfg1["id"] = global_counter
+    cfg1["configuration_status"] = global_counter
+    global_counter += 1
+    cfg1["instrument_type"] = "LISA"
+    cfg1["instrument_name"] = "LISA"
+    cfg1["target"]["name"] = "M43"
+    cfg1["target"]["type"] = "MPC_COMET"
+    cfg1["target"]["ra"] = 83.858
+    cfg1["target"]["dec"] = -5.269
+    cfg1["instrument_configs"][0]["exposure_time"] = 5.0
+    obs1["request"]["configurations"].append(cfg1)
 
     # ----------------------------------------
-    # T200 Observation (Multiple Exposures)
+    # 1m2 Observation 2: Jupiter (Non-Sidereal)
     # ----------------------------------------
-    t200_start = now + timedelta(seconds=30)
-    t200_end = t200_start + timedelta(seconds=60)
+    obs2_start = now + timedelta(seconds=30)
+    obs2_end = obs2_start + timedelta(seconds=25)
     
-    t200_obs = {
+    obs2 = {
         "id": global_obs_counter + 1,
         "request": {
             "id": (global_obs_counter + 1) * 100,
-            "observation_note": "T200 Multi-Exposure",
+            "observation_note": "1m2 Observation 2 - Jupiter",
             "state": "PENDING",
             "acceptability_threshold": 90.0,
             "modified": now.isoformat(),
@@ -128,38 +120,88 @@ def get_schedule():
             "configurations": []
         },
         "site": "PRL",
-        "enclosure": "DomeB",
-        "telescope": "T200",
-        "start": t200_start.isoformat(),
-        "end": t200_end.isoformat(),
-        "priority": 1,
+        "enclosure": "DomeC",
+        "telescope": "1m2",
+        "start": obs2_start.isoformat(),
+        "end": obs2_end.isoformat(),
+        "priority": 2,
         "state": "PENDING",
-        "proposal": "PROP-02",
+        "proposal": "PROP-03",
         "submitter": "astronomer",
-        "name": "T200 Test Obs",
+        "name": "Jupiter Obs",
         "ipp_value": 1.0,
         "observation_type": "NORMAL",
-        "request_group_id": 2,
+        "request_group_id": 4,
         "created": now.isoformat(),
         "modified": now.isoformat()
     }
 
-    # Add 2 configurations (exposures) for T200
-    for i in range(2):
-        cfg = copy.deepcopy(base_config)
-        cfg["id"] = global_counter
-        cfg["configuration_status"] = global_counter
-        global_counter += 1
-        cfg["instrument_type"] = "T200_CAM"
-        cfg["instrument_name"] = "T200_CAM"
-        cfg["target"]["name"] = "Target-Beta"
-        cfg["instrument_configs"][0]["exposure_time"] = 12.0 # 12s each
-        t200_obs["request"]["configurations"].append(cfg)
+    # Add configuration for Jupiter
+    cfg2 = copy.deepcopy(base_config)
+    cfg2["id"] = global_counter
+    cfg2["configuration_status"] = global_counter
+    global_counter += 1
+    cfg2["instrument_type"] = "LISA"
+    cfg2["instrument_name"] = "LISA"
+    cfg2["target"]["name"] = "Jupiter"
+    cfg2["target"]["type"] = "MPC_PLANET"
+    cfg2["target"]["ra"] = 0.0
+    cfg2["target"]["dec"] = 0.0
+    cfg2["instrument_configs"][0]["exposure_time"] = 5.0
+    obs2["request"]["configurations"].append(cfg2)
 
-    global_obs_counter += 2
+    # ----------------------------------------
+    # 1m2 Observation 3: Polaris (Sidereal)
+    # ----------------------------------------
+    obs3_start = now + timedelta(seconds=60)
+    obs3_end = obs3_start + timedelta(seconds=25)
+    
+    obs3 = {
+        "id": global_obs_counter + 2,
+        "request": {
+            "id": (global_obs_counter + 2) * 100,
+            "observation_note": "1m2 Observation 3 - Polaris",
+            "state": "PENDING",
+            "acceptability_threshold": 90.0,
+            "modified": now.isoformat(),
+            "duration": 3600,
+            "configurations": []
+        },
+        "site": "PRL",
+        "enclosure": "DomeC",
+        "telescope": "1m2",
+        "start": obs3_start.isoformat(),
+        "end": obs3_end.isoformat(),
+        "priority": 3,
+        "state": "PENDING",
+        "proposal": "PROP-03",
+        "submitter": "astronomer",
+        "name": "Polaris Obs",
+        "ipp_value": 1.0,
+        "observation_type": "NORMAL",
+        "request_group_id": 5,
+        "created": now.isoformat(),
+        "modified": now.isoformat()
+    }
+
+    # Add configuration for Polaris
+    cfg3 = copy.deepcopy(base_config)
+    cfg3["id"] = global_counter
+    cfg3["configuration_status"] = global_counter
+    global_counter += 1
+    cfg3["instrument_type"] = "LISA"
+    cfg3["instrument_name"] = "LISA"
+    cfg3["target"]["name"] = "Polaris"
+    cfg3["target"]["type"] = "MPC_COMET"
+    cfg3["target"]["ra"] = 37.95
+    cfg3["target"]["dec"] = 89.26
+    cfg3["instrument_configs"][0]["exposure_time"] = 5.0
+    obs3["request"]["configurations"].append(cfg3)
+
+    global_obs_counter += 3
 
     return {
-        "results": [t100_obs, t200_obs]
+        "results": [obs1, obs2, obs3]
     }
 
 @app.patch("/api/observations/{obs_id}/")
