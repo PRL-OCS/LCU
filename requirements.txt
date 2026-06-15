@@ -1,0 +1,9 @@
+astropy
+fastapi
+numpy
+pydantic
+python-dotenv
+requests
+watchdog
+nicegui
+
