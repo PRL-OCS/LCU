@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 app = FastAPI(title="Mock Observation Portal - Multi-Telescope Test")
 
 CURRENT_MODE = "default"
+USE_T2P5 = False
 global_counter = 1000
 global_obs_counter = 1
 
@@ -14,7 +15,7 @@ global_obs_counter = 1
 def get_instruments():
     return {
         "LISA": {
-            "class": "1m2",
+            "class": "T1P2",
             "name": "LISA"
         },
         "T2P5_CAM": {
@@ -55,7 +56,7 @@ def get_schedule():
     now = datetime.now(timezone.utc)
     
     # ----------------------------------------
-    # 1m2 Observation 1: M43 (Sidereal)
+    # Observation 1: M43 (Sidereal)
     # ----------------------------------------
     obs1_start = now + timedelta(seconds=2)
     obs1_end = obs1_start + timedelta(seconds=25)
@@ -64,7 +65,7 @@ def get_schedule():
         "id": global_obs_counter,
         "request": {
             "id": global_obs_counter * 100,
-            "observation_note": "1m2 Observation 1 - M43",
+            "observation_note": "T2P5 Observation 1 - M43" if USE_T2P5 else "T1P2 Observation 1 - M43",
             "state": "PENDING",
             "acceptability_threshold": 90.0,
             "modified": now.isoformat(),
@@ -72,8 +73,8 @@ def get_schedule():
             "configurations": []
         },
         "site": "PRL",
-        "enclosure": "DomeC",
-        "telescope": "1m2",
+        "enclosure": "DomeB" if USE_T2P5 else "DomeC",
+        "telescope": "T2P5" if USE_T2P5 else "T1P2",
         "start": obs1_start.isoformat(),
         "end": obs1_end.isoformat(),
         "priority": 1,
@@ -103,7 +104,7 @@ def get_schedule():
     obs1["request"]["configurations"].append(cfg1)
 
     # ----------------------------------------
-    # 1m2 Observation 2: Jupiter (Non-Sidereal)
+    # Observation 2: Jupiter (Non-Sidereal)
     # ----------------------------------------
     obs2_start = now + timedelta(seconds=30)
     obs2_end = obs2_start + timedelta(seconds=25)
@@ -112,7 +113,7 @@ def get_schedule():
         "id": global_obs_counter + 1,
         "request": {
             "id": (global_obs_counter + 1) * 100,
-            "observation_note": "1m2 Observation 2 - Jupiter",
+            "observation_note": "T2P5 Observation 2 - Jupiter" if USE_T2P5 else "T1P2 Observation 2 - Jupiter",
             "state": "PENDING",
             "acceptability_threshold": 90.0,
             "modified": now.isoformat(),
@@ -120,8 +121,8 @@ def get_schedule():
             "configurations": []
         },
         "site": "PRL",
-        "enclosure": "DomeC",
-        "telescope": "1m2",
+        "enclosure": "DomeB" if USE_T2P5 else "DomeC",
+        "telescope": "T2P5" if USE_T2P5 else "T1P2",
         "start": obs2_start.isoformat(),
         "end": obs2_end.isoformat(),
         "priority": 2,
@@ -151,7 +152,7 @@ def get_schedule():
     obs2["request"]["configurations"].append(cfg2)
 
     # ----------------------------------------
-    # 1m2 Observation 3: Polaris (Sidereal)
+    # Observation 3: Polaris (Sidereal)
     # ----------------------------------------
     obs3_start = now + timedelta(seconds=60)
     obs3_end = obs3_start + timedelta(seconds=25)
@@ -160,7 +161,7 @@ def get_schedule():
         "id": global_obs_counter + 2,
         "request": {
             "id": (global_obs_counter + 2) * 100,
-            "observation_note": "1m2 Observation 3 - Polaris",
+            "observation_note": "T2P5 Observation 3 - Polaris" if USE_T2P5 else "T1P2 Observation 3 - Polaris",
             "state": "PENDING",
             "acceptability_threshold": 90.0,
             "modified": now.isoformat(),
@@ -168,8 +169,8 @@ def get_schedule():
             "configurations": []
         },
         "site": "PRL",
-        "enclosure": "DomeC",
-        "telescope": "1m2",
+        "enclosure": "DomeB" if USE_T2P5 else "DomeC",
+        "telescope": "T2P5" if USE_T2P5 else "T1P2",
         "start": obs3_start.isoformat(),
         "end": obs3_end.isoformat(),
         "priority": 3,
@@ -236,9 +237,11 @@ def patch_configuration_status(config_id: int, payload: dict):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Mock OCS Server")
     parser.add_argument("--mode", type=str, default="default", help="Test mode: 'default' or 'slewing'")
+    parser.add_argument("--t2p5", dest="use_t2p5", action="store_true", help="All schedules are for T2P5 telescope")
     args = parser.parse_args()
     
     CURRENT_MODE = args.mode
-    print(f"Starting Mock OCS Server in MODE: {CURRENT_MODE}")
+    USE_T2P5 = args.use_t2p5
+    print(f"Starting Mock OCS Server in MODE: {CURRENT_MODE} (USE_T2P5: {USE_T2P5})")
     
     uvicorn.run(app, host="127.0.0.1", port=8001)

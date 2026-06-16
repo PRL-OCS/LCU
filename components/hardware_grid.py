@@ -69,10 +69,6 @@ def _build_dom(hardware_container, status):
                                 with ui.row().classes('flex justify-between terminal-bg p-xs rounded border border-outline-variant/20 w-full items-center'):
                                     ui.label('DEC:').classes('text-label-sm font-label-sm text-on-surface-variant')
                                     hardware_container._ui_elements[f'{t_id}_dec'] = ui.label('').classes('font-data-mono text-data-mono text-primary')
-<<<<<<< HEAD
-                                
-=======
->>>>>>> 0882ff1 (added tests and improved the UI)
                                 # Dynamic Extra Telemetry fields
                                 hardware_container._ui_elements[f'{t_id}_extra_telemetry'] = ui.column().classes('space-y-xs w-full gap-2')
                         

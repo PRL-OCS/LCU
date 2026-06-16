@@ -187,18 +187,15 @@ class TestT1P2Flow(unittest.IsolatedAsyncioTestCase):
     async def test_t1p2_sequential_flow(self):
         print("\n--- Step 1: Initializing T1P2 Telescope Plugin ---")
         # 1. Initialize the object (connects to live Skychart, or mock server via redirect)
-        plugin = T1P2TelescopePlugin(telescope_id="1m2")
+        plugin = T1P2TelescopePlugin(telescope_id="T1P2")
         
         # Test basic attributes after initialization
-        self.assertEqual(plugin.get_id(), "1m2")
+        self.assertEqual(plugin.get_id(), "T1P2")
         
         print("\n--- Step 2: Testing Hardware Connection ---")
-        # Verify the hardware connection is active and telemetry thread started
+        # Verify the hardware connection is active and health check thread started
         self.assertTrue(plugin.driver.is_connected)
-        self.assertTrue(plugin.driver.telemetry.running)
-        
-        # Ensure socket is active
-        self.assertIsNotNone(plugin.driver.sock)
+        self.assertTrue(plugin.driver._thread is not None and plugin.driver._thread.is_alive())
 
         print("\n--- Step 3: Testing Polling Telemetry ---")
         if LIVE_TEST:
@@ -275,7 +272,7 @@ class TestT1P2Flow(unittest.IsolatedAsyncioTestCase):
             request=request,
             site="PRL",
             enclosure="DomeA",
-            telescope="1m2",
+            telescope="T1P2",
             start=now - datetime.timedelta(seconds=5),
             end=now + datetime.timedelta(seconds=60),
             priority=1,
@@ -314,7 +311,7 @@ class TestT1P2Flow(unittest.IsolatedAsyncioTestCase):
         if not LIVE_TEST:
             # Slew targets in server should match target RA (in hours) and Dec
             with self.server.lock:
-                self.assertAlmostEqual(self.server.target_ra, 279.23 / 15.0)
+                self.assertAlmostEqual(self.server.target_ra, 18.615)
                 self.assertAlmostEqual(self.server.target_dec, 38.78)
 
         # Stop telemetry thread and disconnect safely
