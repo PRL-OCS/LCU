@@ -20,6 +20,21 @@ class T200MockInstrumentPlugin(InstrumentPlugin):
         await asyncio.sleep(1)
         logger.info(f"[{self.instrument_name} - MOCK] Configuration applied.")
 
+    async def take_acquisition_image(self, exposure_time: float = 5.0, binning: int = 2) -> str:
+        logger.info(f"[{self.instrument_name} - MOCK] Taking acquisition image...")
+        await asyncio.sleep(exposure_time)
+        mock_file = self.output_dir / "mock_acq_image.fits"
+        with open(mock_file, "w") as f:
+            f.write("SIMPLE=T\n")
+        logger.info(f"[{self.instrument_name} - MOCK] Acquisition image saved to {mock_file}")
+        
+        class MockImageObj:
+            # A mock object mimicking an image with attached dummy plate solve success
+            # It just acts as a struct for the manager to use
+            plate_solve_result = (10.0, 20.0) # Assume it hit perfectly for tests
+            pattern_match_result = (10.0, 20.0)
+        return MockImageObj()
+
     async def expose(self, config: Configuration):
         # We assume the config specifies an exposure time, if not default to 3s.
         exposure_time = 3.0

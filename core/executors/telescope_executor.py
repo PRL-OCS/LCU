@@ -3,6 +3,7 @@ from core.states.manager import state_manager
 from core.states.schemas import ObservationState
 from Plugins.base_telescope import TelescopePlugin
 from core.logging_config import logger
+from core.acquisition.manager import AcquisitionManager
 
 class TelescopeExecutor:
     """
@@ -11,6 +12,7 @@ class TelescopeExecutor:
     def __init__(self, telescope_plugin: TelescopePlugin, plugin_manager):
         self.telescope_plugin = telescope_plugin
         self.plugin_manager = plugin_manager
+        self.acquisition_manager = AcquisitionManager()
         self.telescope_id = self.telescope_plugin.get_id()
         self._running = False
         self._task = None
@@ -160,6 +162,24 @@ class TelescopeExecutor:
                         state_manager.update_observation(obs_id, ObservationState.SLEWING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id) # Flash state for continuity
                         
                     await self.telescope_plugin.start_tracking(target)
+
+                    # --- ACQUISITION LOOP ---
+                    # Only acquire if target requires it (could be based on target.type or config)
+                    # For now, we attempt acquisition on all targets
+                    state_manager.update_observation(obs_id, ObservationState.ACQUIRING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
+                    logger.info(f"[{self.telescope_id}] Handing over to AcquisitionManager...")
+                    
+                    acquired = await self.acquisition_manager.acquire_target(target, self.telescope_plugin, matched_instrument)
+                    if not acquired:
+                        logger.error(f"[{self.telescope_id}] Failed to acquire target {target.name}. Aborting observation.")
+                        state_manager.update_observation(
+                            obs_id, 
+                            ObservationState.ABORTED, 
+                            reason="Target acquisition failed",
+                            pramana_obs_id=obs.id,
+                            pramana_config_id=pramana_config_id
+                        )
+                        continue
 
                     # CONFIGURING
                     state_manager.update_observation(obs_id, ObservationState.CONFIGURING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)

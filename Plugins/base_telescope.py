@@ -117,6 +117,29 @@ class TelescopePlugin(ABC):
         pass
 
     @abstractmethod
+    async def correct_pointing(self, target_ra: float, target_dec: float, actual_ra: float, actual_dec: float):
+        """
+        Applies a pointing correction either via SYNC or offset slewing based on the 
+        delta between actual coordinates and target coordinates.
+        """
+        pass
+
+    @abstractmethod
+    def has_active_pointing_model(self) -> bool:
+        """
+        Returns True if the telescope has an active pointing model engaged.
+        """
+        pass
+        
+    @abstractmethod
+    async def get_pointing_model_coordinates(self, target_ra: float, target_dec: float):
+        """
+        Queries the active pointing model to calculate what the actual RA/Dec will be 
+        if we command a slew to target_ra/target_dec.
+        """
+        pass
+
+    @abstractmethod
     def get_current_telemetry(self) -> dict:
         """
         Returns a snapshot of the current hardware state/telemetry.

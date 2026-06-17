@@ -6,3 +6,5 @@ python-dotenv==1.2.2
 Requests==2.34.2
 watchdog==6.0.0
 nicegui==1.4.32
+scipy==1.14.0
+astroquery==0.4.7
