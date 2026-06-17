@@ -16,7 +16,6 @@ class TelescopeExecutor:
         self.telescope_id = self.telescope_plugin.get_id()
         self._running = False
         self._task = None
-        self._telemetry_task = None
         self.current_obs_id = None
         self.current_ra = None
         self.current_dec = None
@@ -255,18 +254,13 @@ class TelescopeExecutor:
                 await asyncio.sleep(2)
 
     def start(self):
-        self._running = True
         if not self._task or self._task.done():
             self._task = asyncio.create_task(self.run())
-        if not self._telemetry_task or self._telemetry_task.done():
-            self._telemetry_task = asyncio.create_task(self._telemetry_loop())
 
     def stop(self):
         self._running = False
         if self._task:
             self._task.cancel()
-        if self._telemetry_task:
-            self._telemetry_task.cancel()
 
     def abort(self, reason: str):
         """
@@ -290,7 +284,7 @@ class TelescopeExecutor:
                 )
             except Exception as e:
                 logger.error(f"[{self.telescope_id}] Telemetry loop error: {e}")
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(0.2)
 
     def get_status(self):
         # Find the state of the current observation from the state manager
@@ -300,19 +294,21 @@ class TelescopeExecutor:
             if status_obj:
                 current_state = status_obj.current_state.value
                 
-        # Read from cached telemetry
+        # Query telemetry to update coordinates on the plugin
         telemetry = {}
-        if hasattr(self.telescope_plugin, '_last_telemetry_cache') and self.telescope_plugin._last_telemetry_cache:
-            telemetry = self.telescope_plugin._last_telemetry_cache
-            
+        try:
+            telemetry = self.telescope_plugin.get_current_telemetry()
+        except Exception as e:
+            pass
+
         status_dict = {
             "telescope_id": self.telescope_plugin.get_id(),
             "running": self._running,
             "queue_size": len(getattr(self.telescope_plugin, 'observations', [])),
             "current_obs_id": self.current_obs_id,
             "current_state": current_state,
-            "current_ra": telemetry.get("ra", getattr(self.telescope_plugin, 'current_ra', self.current_ra)),
-            "current_dec": telemetry.get("dec", getattr(self.telescope_plugin, 'current_dec', self.current_dec)),
+            "current_ra": getattr(self.telescope_plugin, 'current_ra', self.current_ra),
+            "current_dec": getattr(self.telescope_plugin, 'current_dec', self.current_dec),
             "exposure_start_time": self.exposure_start_time,
             "exposure_duration": self.exposure_duration
         }

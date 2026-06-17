@@ -7,3 +7,6 @@
 [submodule "Plugins/telescope/T1P2"]
 	path = Plugins/telescope/T1P2
 	url = https://github.com/PRL-OCS/T1P2_Plugin.git
+[submodule "Plugins/instrument/LISA"]
+	path = Plugins/instrument/LISA
+	url = https://github.com/PRL-OCS/lisa_plugin.git
