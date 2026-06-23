@@ -23,7 +23,8 @@ MOCK_API_DATA = {
             "type": "EXPOSE",
             "priority": 1,
             "instrument_configs": [{
-                "optical_elements": {"filter": "luminance"},
+                # Using comma-separated string under "filter" to test both wheels
+                "optical_elements": {"filter": "G, Z"},
                 "mode": "full",
                 "exposure_time": 2.0,
                 "exposure_count": 2,
@@ -32,6 +33,7 @@ MOCK_API_DATA = {
                     "binning": "2x2", 
                     "cooling": -5.0,
                     "delay": 1.0,
+                    "nd_filter": True, # Test ND filter insertion
                     "subframe_x": 0, "subframe_y": 0, "subframe_w": 1000, "subframe_h": 1000
                 },
                 "rois": []
@@ -73,7 +75,11 @@ async def run_live_test():
     
     print("[1] Initialising plugin (will trigger startup connect)...\n")
     # This will automatically POST to /api/command with {"command": "connect"}
-    plugin = FOCCameraPlugin(instrument_name="FOC", api_url="http://127.0.0.1:8000")
+    # Use IP from command line argument if provided, otherwise default to localhost
+    ip_address = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
+    api_url = f"http://{ip_address}:8002"
+    print(f"Connecting to FOC server at {api_url}...")
+    plugin = FOCCameraPlugin(instrument_name="FOC", api_url=api_url)
     
     # Wait briefly for startup logs to flush
     await asyncio.sleep(1)
