@@ -83,6 +83,13 @@ class InstrumentPlugin(ABC):
         """
         pass
 
+    @abstractmethod
+    async def take_acquisition_image(self, exposure_time: float = 5.0, binning: int = 2) -> str:
+        """
+        Takes a short exposure for closed-loop acquisition and returns the file path or image object.
+        """
+        pass
+
 
     def save_to_disk(self):
         """

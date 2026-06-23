@@ -1,5 +1,6 @@
 # Set mock environment variable before loading core imports
 import os
+import sys
 os.environ["PRAMANA_API_TOKEN"] = "mock_token"
 
 import unittest
@@ -30,10 +31,13 @@ class TestAllModules(unittest.IsolatedAsyncioTestCase):
             if not self.mock_t or not self.mock_i:
                 raise RuntimeError("Mock plugins not found. Tests cannot proceed.")
             self.__class__._initialized = True
+        else:
+            orchestrator.executor_manager.stop_all()
+            orchestrator.executor_manager.start_all(orchestrator.plugin_manager)
             
         state_manager.observations.clear()
         self.mock_t.targets.clear()
-        self.mock_i.configs.clear()
+        self.mock_i.observations.clear()
 
     def _get_mock_mapping_response(self):
         """Returns a valid hardware mapping response."""
@@ -45,7 +49,11 @@ class TestAllModules(unittest.IsolatedAsyncioTestCase):
         }
 
     def _get_mock_schedule_response(self, obs_id: int = 100, instrument: str = "MOCK_CAM"):
-        """Returns a valid schedule response."""
+        """Returns a valid schedule response with dynamic start and end times to prevent expiration."""
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        start_str = (now - datetime.timedelta(minutes=10)).isoformat().replace("+00:00", "Z")
+        end_str = (now + datetime.timedelta(hours=2)).isoformat().replace("+00:00", "Z")
         return {
             "results": [
                 {
@@ -55,38 +63,38 @@ class TestAllModules(unittest.IsolatedAsyncioTestCase):
                         "observation_note": "Mock observation",
                         "state": "PENDING",
                         "acceptability_threshold": 90.0,
-                        "modified": "2026-05-22T00:00:00Z",
+                        "modified": start_str,
                         "duration": 3600,
                         "configurations": [
                             {
-                                "id": obs_id,
-                                "instrument_type": instrument,
-                                "type": "TEST",
-                                "priority": 1,
-                                "instrument_configs": [
-                                    {
-                                        "mode": "IMG",
-                                        "exposure_time": 1.0
-                                    }
-                                ],
-                                "target": {
-                                    "type": "ICRS",
-                                    "name": f"Test Target {obs_id}",
-                                    "ra": 100.0,
-                                    "dec": 10.0,
-                                    "epoch": 2000.0
-                                },
-                                "configuration_status": 1,
-                                "state": "PENDING",
-                                "instrument_name": instrument
-                            }
+                                 "id": obs_id,
+                                 "instrument_type": instrument,
+                                 "type": "TEST",
+                                 "priority": 1,
+                                 "instrument_configs": [
+                                     {
+                                         "mode": "IMG",
+                                         "exposure_time": 1.0
+                                     }
+                                 ],
+                                 "target": {
+                                     "type": "ICRS",
+                                     "name": f"Test Target {obs_id}",
+                                     "ra": 100.0,
+                                     "dec": 10.0,
+                                     "epoch": 2000.0
+                                 },
+                                 "configuration_status": 1,
+                                 "state": "PENDING",
+                                 "instrument_name": instrument
+                             }
                         ]
                     },
                     "site": "PRL",
                     "enclosure": "DomeA",
                     "telescope": "T100",
-                    "start": "2026-05-22T00:00:00Z",
-                    "end": "2026-05-22T01:00:00Z",
+                    "start": start_str,
+                    "end": end_str,
                     "priority": 1,
                     "state": "PENDING",
                     "proposal": "PROP-01",
@@ -95,8 +103,8 @@ class TestAllModules(unittest.IsolatedAsyncioTestCase):
                     "ipp_value": 1.0,
                     "observation_type": "NORMAL",
                     "request_group_id": 1,
-                    "created": "2026-05-22T00:00:00Z",
-                    "modified": "2026-05-22T00:00:00Z"
+                    "created": start_str,
+                    "modified": start_str
                 }
             ]
         }
@@ -125,7 +133,7 @@ class TestAllModules(unittest.IsolatedAsyncioTestCase):
         
         # Assert the data hit the plugins
         self.assertEqual(len(self.mock_t.targets), 1)
-        self.assertEqual(len(self.mock_i.configs), 1)
+        self.assertEqual(len(self.mock_i.observations), 1)
         
         # Wait for the background executor to process it
         processed = False
@@ -163,7 +171,7 @@ class TestAllModules(unittest.IsolatedAsyncioTestCase):
         # Because the instrument plugin doesn't exist, the orchestrator should skip it
         # Therefore, the telescope should NOT receive the target
         self.assertEqual(len(self.mock_t.targets), 0)
-        self.assertEqual(len(self.mock_i.configs), 0)
+        self.assertEqual(len(self.mock_i.observations), 0)
         
 if __name__ == '__main__':
     unittest.main()

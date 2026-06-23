@@ -1,15 +1,14 @@
 import asyncio
-import json
 from pathlib import Path
 from Plugins.base_instrument import InstrumentPlugin
 from core.communications.schemas import Configuration
 from core.logging_config import logger
 
-class T200MockInstrumentPlugin(InstrumentPlugin):
+class T2P5MockInstrumentPlugin(InstrumentPlugin):
     """
-    A mock instrument plugin for T200 testing.
+    A mock instrument plugin for T2P5 testing.
     """
-    def __init__(self, instrument_name: str = "T200_CAM"):
+    def __init__(self, instrument_name: str = "T2P5_CAM"):
         super().__init__(instrument_name=instrument_name)
         self.output_dir = Path("storage/cache")
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -19,21 +18,6 @@ class T200MockInstrumentPlugin(InstrumentPlugin):
         # Simulate filter wheel and readout setup
         await asyncio.sleep(1)
         logger.info(f"[{self.instrument_name} - MOCK] Configuration applied.")
-
-    async def take_acquisition_image(self, exposure_time: float = 5.0, binning: int = 2) -> str:
-        logger.info(f"[{self.instrument_name} - MOCK] Taking acquisition image...")
-        await asyncio.sleep(exposure_time)
-        mock_file = self.output_dir / "mock_acq_image.fits"
-        with open(mock_file, "w") as f:
-            f.write("SIMPLE=T\n")
-        logger.info(f"[{self.instrument_name} - MOCK] Acquisition image saved to {mock_file}")
-        
-        class MockImageObj:
-            # A mock object mimicking an image with attached dummy plate solve success
-            # It just acts as a struct for the manager to use
-            plate_solve_result = (10.0, 20.0) # Assume it hit perfectly for tests
-            pattern_match_result = (10.0, 20.0)
-        return MockImageObj()
 
     async def expose(self, config: Configuration):
         # We assume the config specifies an exposure time, if not default to 3s.

@@ -18,6 +18,7 @@ class ObservationState(str, Enum):
     IDLE = "IDLE"
     PREPARING = "PREPARING"
     SLEWING = "SLEWING"        # Telescope moving
+    ACQUIRING = "ACQUIRING"    # Closed-loop target verification
     CONFIGURING = "CONFIGURING" # Instrument setting up
     CALIBRATING = "CALIBRATING" # Dark/Flat/Bias frames
     EXPOSING = "EXPOSING"       # Shutter open

@@ -60,6 +60,21 @@ class MockTelescopePlugin(TelescopePlugin):
         logger.info(f"[{self.telescope_id} - MOCK] Pausing tracking.")
         self.is_tracking = False
 
+    async def correct_pointing(self, target_ra: float, target_dec: float, actual_ra: float, actual_dec: float):
+        logger.info(f"[{self.telescope_id} - MOCK] Correcting pointing offset...")
+        await asyncio.sleep(1)
+        self.current_ra = target_ra
+        self.current_dec = target_dec
+        logger.info(f"[{self.telescope_id} - MOCK] Correction applied.")
+
+    def has_active_pointing_model(self) -> bool:
+        return getattr(self, 'active_pointing_model', False)
+
+    async def get_pointing_model_coordinates(self, target_ra: float, target_dec: float):
+        await asyncio.sleep(0.1)
+        # If it has a model, we mock it returning coordinates exactly on target
+        return target_ra, target_dec
+
     def get_current_telemetry(self) -> Dict[str, Any]:
         return {
             "telescope_id": self.telescope_id,

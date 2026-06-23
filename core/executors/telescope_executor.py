@@ -3,6 +3,7 @@ from core.states.manager import state_manager
 from core.states.schemas import ObservationState
 from Plugins.base_telescope import TelescopePlugin
 from core.logging_config import logger
+from core.acquisition.manager import AcquisitionManager
 
 class TelescopeExecutor:
     """
@@ -11,6 +12,7 @@ class TelescopeExecutor:
     def __init__(self, telescope_plugin: TelescopePlugin, plugin_manager):
         self.telescope_plugin = telescope_plugin
         self.plugin_manager = plugin_manager
+        self.acquisition_manager = AcquisitionManager()
         self.telescope_id = self.telescope_plugin.get_id()
         self._running = False
         self._task = None
@@ -160,6 +162,24 @@ class TelescopeExecutor:
                         
                     await self.telescope_plugin.start_tracking(target)
 
+                    # --- ACQUISITION LOOP ---
+                    # Only acquire if target requires it (could be based on target.type or config)
+                    # For now, we attempt acquisition on all targets
+                    state_manager.update_observation(obs_id, ObservationState.ACQUIRING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
+                    logger.info(f"[{self.telescope_id}] Handing over to AcquisitionManager...")
+                    
+                    acquired = await self.acquisition_manager.acquire_target(target, self.telescope_plugin, matched_instrument)
+                    if not acquired:
+                        logger.error(f"[{self.telescope_id}] Failed to acquire target {target.name}. Aborting observation.")
+                        state_manager.update_observation(
+                            obs_id, 
+                            ObservationState.ABORTED, 
+                            reason="Target acquisition failed",
+                            pramana_obs_id=obs.id,
+                            pramana_config_id=pramana_config_id
+                        )
+                        continue
+
                     # CONFIGURING
                     state_manager.update_observation(obs_id, ObservationState.CONFIGURING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
                     logger.info(f"[{self.telescope_id}] Configuring instrument {matched_instrument.get_id()}...")
@@ -251,6 +271,20 @@ class TelescopeExecutor:
         self._running = False
         if self._task:
             self._task.cancel()
+        if self._telemetry_task:
+            self._telemetry_task.cancel()
+
+    async def _telemetry_loop(self):
+        logger.info(f"Started telemetry loop for telescope: {self.telescope_id}")
+        while self._running:
+            try:
+                # Query get_current_telemetry in a separate thread to not block main loop
+                await asyncio.get_event_loop().run_in_executor(
+                    None, self.telescope_plugin.get_current_telemetry
+                )
+            except Exception as e:
+                logger.error(f"[{self.telescope_id}] Telemetry loop error: {e}")
+            await asyncio.sleep(0.2)
 
     def get_status(self):
         # Find the state of the current observation from the state manager
