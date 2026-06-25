@@ -34,6 +34,11 @@ class ExecutorManager:
         for executor in self.executors.values():
             executor.stop()
 
+    def abort_executor(self, telescope_id: str, reason: str = "Operator Abort"):
+        if telescope_id in self.executors:
+            self.executors[telescope_id].abort(reason)
+            logger.warning(f"Executor for {telescope_id} has been aborted and set to manual mode.")
+
     def get_status(self) -> dict:
         return {
             t_id: executor.get_status()

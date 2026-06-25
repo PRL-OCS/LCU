@@ -49,7 +49,7 @@ def _build_dom(hardware_container, status):
         for t_id in t_plugins.keys():
             with ui.column().classes('glass-panel panel-border rounded-xl overflow-hidden flex flex-col p-0 gap-0 w-full'):
                 with ui.row().classes('w-full p-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low m-0'):
-                    ui.label(f'{t_id} Subsystem').classes('font-headline-sm text-headline-sm font-bold text-on-surface')
+                    ui.button(f'{t_id} Subsystem', icon='open_in_new', on_click=lambda _, t=t_id: ui.navigate.to(f'/telescope/{t}')).classes('font-headline-sm text-headline-sm font-bold text-on-surface hover:text-primary transition-colors bg-transparent shadow-none p-0')
                     ui.label('ONLINE').classes('px-sm py-base bg-secondary-container/20 text-secondary text-label-sm font-label-sm rounded border border-secondary/30')
                 
                 with ui.element('div').classes('p-md grid grid-cols-1 md:grid-cols-2 gap-md w-full'):
@@ -163,7 +163,7 @@ def update_hardware_grid(hardware_container, status):
             keys_to_exclude = {
                 "telescope_id", "running", "queue_size", "current_obs_id", 
                 "current_state", "current_ra", "current_dec", "exposure_start_time", 
-                "exposure_duration", "ra", "dec"
+                "exposure_duration", "ra", "dec", "current_obs_dict"
             }
             
             extra_items = []
@@ -231,7 +231,7 @@ def update_hardware_grid(hardware_container, status):
             keys_to_exclude = {
                 "telescope_id", "running", "queue_size", "current_obs_id", 
                 "current_state", "current_ra", "current_dec", "exposure_start_time", 
-                "exposure_duration", "ra", "dec"
+                "exposure_duration", "ra", "dec", "current_obs_dict"
             }
             
             extra_items = []
@@ -290,10 +290,10 @@ def update_hardware_grid(hardware_container, status):
                 
                 exposure_start = executors.get(t_id, {}).get('exposure_start_time')
                 exposure_dur = executors.get(t_id, {}).get('exposure_duration')
-                if i_state == 'EXPOSING' and exposure_start and exposure_dur:
+                if i_state == 'EXPOSING' and exposure_start is not None and exposure_dur is not None:
                     elapsed = time.time() - exposure_start
-                    progress = min(max(elapsed / exposure_dur, 0.0), 1.0)
-                    hardware_container._ui_elements[f'{i_id}_prog'].value = progress
+                    progress = min(max(elapsed / exposure_dur, 0.0), 1.0) if exposure_dur > 0 else 1.0
+                    hardware_container._ui_elements[f'{i_id}_prog'].set_value(progress)
                     hardware_container._ui_elements[f'{i_id}_prog_text'].set_text(f'{elapsed:.1f}s / {exposure_dur}s')
                     hardware_container._ui_elements[f'{i_id}_prog_container'].style('display: flex')
                 else:
