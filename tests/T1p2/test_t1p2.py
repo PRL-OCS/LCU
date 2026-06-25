@@ -20,7 +20,7 @@ sys.argv = [sys.argv[0]] + unknown
 LIVE_TEST = args.live
 
 # Add LCU root to path so imports work correctly
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from Plugins.telescope.T1P2.telescope_plugin import T1P2TelescopePlugin
 from core.communications.schemas import Target, Configuration, InstrumentConfig, ScheduleSchema, RequestSchema

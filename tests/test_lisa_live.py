@@ -72,8 +72,28 @@ async def run_live_test():
     print("=========================================\n")
     
     print("[1] Initialising plugin (will trigger startup connect)...\n")
+    api_url = os.environ.get("LISA_API_URL", "http://127.0.0.1:8000")
+    if len(sys.argv) > 1:
+        api_url = sys.argv[1]
+        if not api_url.startswith("http"):
+            api_url = f"http://{api_url}"
+            if ":" not in api_url.replace("http://", ""):
+                api_url = f"{api_url}:8000"
+    print(f"Using API URL: {api_url}")
+
+    # Early exit check: Verify the server is actually reachable before proceeding
+    try:
+        import requests
+        print("Checking server connectivity...")
+        requests.get(f"{api_url}/", timeout=3)
+    except Exception as e:
+        print(f"\n[!] FATAL: API server is NOT reachable at {api_url}.")
+        print("Please check if the server is running, bound to 0.0.0.0, and the firewall is open.")
+        print(f"Error details: {e}")
+        return
+
     # This will automatically POST to /api/command with {"command": "connect"}
-    plugin = LISACameraPlugin(instrument_name="LISA", api_url="http://127.0.0.1:8000")
+    plugin = LISACameraPlugin(instrument_name="LISA", api_url=api_url)
     
     # Wait briefly for startup logs to flush
     await asyncio.sleep(1)
@@ -83,6 +103,11 @@ async def run_live_test():
     temp = await plugin.get_temperature()
     print(f"Info: {info}")
     print(f"Temp: {temp}")
+
+    if info is None:
+        print("\n[!] Failed to connect or retrieve info from server. Stopping test.")
+        await plugin.disconnect()
+        return
 
     obs = ScheduleSchema.model_validate(MOCK_API_DATA)
     config = obs.request.configurations[0]
