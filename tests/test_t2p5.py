@@ -118,9 +118,9 @@ class TestT2P5Flow(unittest.IsolatedAsyncioTestCase):
         target = Target(
             configuration_id=500,
             type="ICRS",
-            name="Vega",
-            ra=279.23,  # 18.615 hours
-            dec=38.78,
+            name="Polaris",
+            ra=37.95454167,  # 18.615 hours
+            dec=89.26410833,
             epoch=2000.0
         )
         
@@ -192,8 +192,8 @@ class TestT2P5Flow(unittest.IsolatedAsyncioTestCase):
         if not LIVE_TEST:
             # Slew targets in server should match target RA (in hours) and Dec
             with self.server.lock:
-                self.assertAlmostEqual(self.server.target_ra, 279.23 / 15.0)
-                self.assertAlmostEqual(self.server.target_dec, 38.78)
+                self.assertAlmostEqual(self.server.target_ra, target.ra / 15.0)
+                self.assertAlmostEqual(self.server.target_dec, target.dec)
 
         # Stop telemetry thread and disconnect safely
         plugin.driver.disconnect()

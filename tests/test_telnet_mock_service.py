@@ -171,13 +171,15 @@ class MockTelnetServer:
                         response = b"stop complete\r\n"
                     elif cmd == "do":
                         if len(parts) > 1 and parts[1] == "target":
+                            import re
                             ra_val = 0.0
                             dec_val = 0.0
-                            for p in parts[2:]:
-                                if p.startswith("ra="):
-                                    ra_val = parse_sexagesimal(p.split("=")[1])
-                                elif p.startswith("dec="):
-                                    dec_val = parse_sexagesimal(p.split("=")[1])
+                            ra_match = re.search(r'ra=([^=]+?)(?:\s+dec=|$)', line)
+                            dec_match = re.search(r'dec=([^=]+?)(?:\s+ra=|$)', line)
+                            if ra_match:
+                                ra_val = parse_sexagesimal(ra_match.group(1).strip())
+                            if dec_match:
+                                dec_val = parse_sexagesimal(dec_match.group(1).strip())
                             with self.lock:
                                 self.target_ra = ra_val
                                 self.target_dec = dec_val
