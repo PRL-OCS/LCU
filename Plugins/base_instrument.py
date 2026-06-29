@@ -77,9 +77,10 @@ class InstrumentPlugin(ABC):
         pass
 
     @abstractmethod
-    async def expose(self, config: Configuration):
+    async def expose(self, config: Configuration) -> str:
         """
         Triggers the exposure and waits for it to complete.
+        Returns the absolute path to the generated FITS file.
         """
         pass
 

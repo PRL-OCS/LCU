@@ -83,6 +83,12 @@ class LCUOrchestrator:
         else:
             state_manager.update_system_state(LCUState.IDLE)
 
+    def abort_telescope(self, telescope_id: str, reason: str = "Operator Abort"):
+        """
+        Aborts the specified telescope executor, putting it into manual mode.
+        """
+        executor_manager.abort_executor(telescope_id, reason)
+
     def rescan_plugins(self):
         """
         Manually trigger discovery scan.

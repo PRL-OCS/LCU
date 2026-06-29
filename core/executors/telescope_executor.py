@@ -4,6 +4,7 @@ from core.states.schemas import ObservationState
 from Plugins.base_telescope import TelescopePlugin
 from core.logging_config import logger
 from core.acquisition.manager import AcquisitionManager
+from core.ingestion import ingestion_manager
 
 class TelescopeExecutor:
     """
@@ -23,6 +24,8 @@ class TelescopeExecutor:
         self.exposure_duration = None
         self.active_instrument = None
         self.abort_reason = None
+        self.is_manual_mode = False
+        self.current_obs_dict = None
 
     async def run(self):
         self._running = True
@@ -31,7 +34,7 @@ class TelescopeExecutor:
         while self._running:
             try:
                 from core.states.schemas import LCUState
-                if state_manager.system_state == LCUState.MANUAL:
+                if self.is_manual_mode or state_manager.system_state == LCUState.MANUAL:
                     await asyncio.sleep(2)
                     continue
 
@@ -75,6 +78,8 @@ class TelescopeExecutor:
                     delay = (obs.start - now).total_seconds()
                     logger.info(f"[{self.telescope_id}] Observation {obs.id} scheduled in the future. Waiting {delay:.1f}s...")
                     await asyncio.sleep(delay)
+
+                self.current_obs_dict = obs.model_dump(mode='json')
 
                 # Loop through a shallow copy of configurations to prevent iterator skipping 
                 # when the instrument plugin pops them out of the shared schema list.
@@ -198,14 +203,30 @@ class TelescopeExecutor:
                     self.exposure_duration = exposure_time
                     
                     logger.info(f"[{self.telescope_id}] Exposing for {exposure_time}s...")
-                    await matched_instrument.expose(matched_config)
+                    file_path = await matched_instrument.expose(matched_config)
                     
                     self.exposure_start_time = None
                     self.exposure_duration = None
 
-                    # READING_OUT
+                    # READING_OUT (In our context, reading out/ingesting)
                     state_manager.update_observation(obs_id, ObservationState.READING_OUT, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
-                    logger.info(f"[{self.telescope_id}] Reading out...")
+                    logger.info(f"[{self.telescope_id}] Readout complete. Handing over to IngestionManager...")
+                    
+                    if file_path:
+                        # Fetch the latest telemetry snapshot
+                        try:
+                            telemetry = self.telescope_plugin.get_current_telemetry()
+                        except Exception:
+                            telemetry = {}
+                        
+                        # We pass the full observation dict to the ingestion queue so it can be serialized
+                        await ingestion_manager.enqueue(
+                            file_path=file_path,
+                            obs_dict=obs.model_dump(),
+                            config_id=matched_config.id,
+                            telemetry=telemetry
+                        )
+                    
                     await asyncio.sleep(1) 
                     
                     state_manager.update_observation(
@@ -221,6 +242,7 @@ class TelescopeExecutor:
                 
                 # All configurations complete for this observation. Now clear from local cache.
                 getattr(self.telescope_plugin, 'complete_current_observation', lambda: None)()
+                self.current_obs_dict = None
                 
             except asyncio.CancelledError:
                 logger.info(f"[{self.telescope_id}] Task cancelled.")
@@ -249,6 +271,7 @@ class TelescopeExecutor:
                         pramana_config_id=p_config_id
                     )
                 self.current_obs_id = None
+                self.current_obs_dict = None
                 # Clear from cache so we don't get stuck in a crash loop with a bad target
                 getattr(self.telescope_plugin, 'complete_current_observation', lambda: None)()
                 await asyncio.sleep(2)
@@ -264,15 +287,21 @@ class TelescopeExecutor:
 
     def abort(self, reason: str):
         """
-        Emergency stop mechanism.
+        Emergency stop mechanism. Aborts current target and drops to manual mode.
         """
         logger.error(f"[{self.telescope_id}] Abort requested: {reason}")
         self.abort_reason = reason
-        self._running = False
-        if self._task:
-            self._task.cancel()
-        if self._telemetry_task:
-            self._telemetry_task.cancel()
+        self.is_manual_mode = True
+        
+        if getattr(self, 'current_obs_id', None):
+            state_manager.update_observation(self.current_obs_id, ObservationState.ABORTED, reason=self.abort_reason)
+            self.current_obs_id = None
+            self.current_obs_dict = None
+            
+        # Fire-and-forget hardware stops so we don't block
+        asyncio.create_task(self.telescope_plugin.force_stop())
+        if getattr(self, 'active_instrument', None):
+            asyncio.create_task(self.active_instrument.force_stop())
 
     async def _telemetry_loop(self):
         logger.info(f"Started telemetry loop for telescope: {self.telescope_id}")
@@ -310,7 +339,9 @@ class TelescopeExecutor:
             "current_ra": getattr(self.telescope_plugin, 'current_ra', self.current_ra),
             "current_dec": getattr(self.telescope_plugin, 'current_dec', self.current_dec),
             "exposure_start_time": self.exposure_start_time,
-            "exposure_duration": self.exposure_duration
+            "exposure_duration": self.exposure_duration,
+            "is_manual_mode": self.is_manual_mode,
+            "current_obs_dict": getattr(self, 'current_obs_dict', None)
         }
 
         # Merge additional telemetry keys from the plugin

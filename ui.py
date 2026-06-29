@@ -6,6 +6,7 @@ from components.action_bar import render_action_bar
 from components.status_cards import render_status_cards
 from components.hardware_grid import render_hardware_grid, update_hardware_grid
 from components.log_console import render_log_console, update_log_console
+import pages.telescope_page
 
 @ui.page('/')
 def dashboard_page():
