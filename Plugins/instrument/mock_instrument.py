@@ -16,6 +16,7 @@ class MockInstrumentPlugin(InstrumentPlugin):
         super().__init__(instrument_name=instrument_name)
         self.output_dir = Path("storage/cache")
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.fov_type = 'wide'  # Mock camera simulates a wide-field instrument
 
     async def configure(self, config: Configuration):
         logger.info(f"[{self.instrument_name} - MOCK] Configuring instrument for config ID: {config.id}...")

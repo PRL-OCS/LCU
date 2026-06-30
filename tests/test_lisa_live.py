@@ -8,6 +8,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Plugins.instrument.LISA.instrument_plugin import LISACameraPlugin
 from core.communications.schemas import ScheduleSchema
 
+
+
 MOCK_API_DATA = {
     "id": 1,
     "request": {
@@ -25,8 +27,8 @@ MOCK_API_DATA = {
             "instrument_configs": [{
                 "optical_elements": {"filter": "luminance"},
                 "mode": "full",
-                "exposure_time": 2.0,
-                "exposure_count": 2,
+                "exposure_time": 10.0,
+                "exposure_count": 1,
                 "rotator_mode": "SKY",
                 "extra_params": {
                     "binning": "2x2", 
@@ -70,6 +72,38 @@ async def run_live_test():
     print("=========================================")
     print("  LISA PLUGIN LIVE INTEGRATION TEST")
     print("=========================================\n")
+    
+    # 1. Check command-line arguments for direct run flag
+    run_direct = "--direct" in sys.argv or "--now" in sys.argv
+    obs = ScheduleSchema.model_validate(MOCK_API_DATA)
+    
+    if not run_direct:
+        from datetime import datetime, timezone, timedelta
+        start_time = obs.start
+        now_utc = datetime.now(timezone.utc)
+        
+        # If the start time is in the past, update it to 5 seconds in the future for this test run
+        if start_time < now_utc:
+            print(f"[INFO] Scheduled start time ({start_time.isoformat()}) is in the past.")
+            print("Updating scheduled start time to 5 seconds in the future for testing...")
+            start_time = datetime.now(timezone.utc) + timedelta(seconds=5)
+            # Update the MOCK_API_DATA so that the schema is validated with the new start time
+            MOCK_API_DATA["start"] = start_time.isoformat().replace("+00:00", "Z")
+            obs = ScheduleSchema.model_validate(MOCK_API_DATA)
+            
+        print(f"Scheduled Start Time: {start_time.isoformat()}")
+        print("To bypass this wait, run the script with: py tests/test_lisa_live.py --direct\n")
+        
+        while True:
+            now_utc = datetime.now(timezone.utc)
+            remaining = (start_time - now_utc).total_seconds()
+            if remaining <= 0:
+                print("\n[Schedule reached! Starting test...]\n")
+                break
+            print(f"\rWaiting for schedule start... {int(remaining)}s remaining", end="", flush=True)
+            await asyncio.sleep(0.5)
+    else:
+        print("[INFO] Running in DIRECT mode (bypassing scheduled wait).\n")
     
     print("[1] Initialising plugin (will trigger startup connect)...\n")
     api_url = os.environ.get("LISA_API_URL", "http://127.0.0.1:8000")
@@ -115,7 +149,7 @@ async def run_live_test():
     print("\n[3] Triggering CONFIGURE (Setting filters, binning, etc.)...")
     await plugin.configure(config)
     
-    print("\n[4] Triggering EXPOSE (2x 2.0s sequence)...")
+    print("\n[4] Triggering EXPOSE (1x 2.0s exposure)...")
     await plugin.expose(config)
     
     print("\n[5] Test sequence complete. Cleaning up...")

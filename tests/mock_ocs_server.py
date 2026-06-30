@@ -21,6 +21,14 @@ def get_instruments():
         "T2P5_CAM": {
             "class": "T2P5",
             "name": "T2P5_CAM"
+        },
+        "FOC": {
+            "class": "T100",
+            "name": "FOC"
+        },
+        "T200_CAM": {
+            "class": "T100",
+            "name": "T200_CAM"
         }
     }
 
@@ -74,7 +82,7 @@ def get_schedule():
         },
         "site": "PRL",
         "enclosure": "DomeB" if USE_T2P5 else "DomeC",
-        "telescope": "T2P5" if USE_T2P5 else "T1P2",
+        "telescope": "T2P5" if USE_T2P5 else "T100",
         "start": obs1_start.isoformat(),
         "end": obs1_end.isoformat(),
         "priority": 1,
@@ -94,8 +102,8 @@ def get_schedule():
     cfg1["id"] = global_counter
     cfg1["configuration_status"] = global_counter
     global_counter += 1
-    cfg1["instrument_type"] = "LISA"
-    cfg1["instrument_name"] = "LISA"
+    cfg1["instrument_type"] = "FOC"
+    cfg1["instrument_name"] = "FOC"
     cfg1["target"]["name"] = "M43"
     cfg1["target"]["type"] = "MPC_COMET"
     cfg1["target"]["ra"] = 83.858
@@ -122,7 +130,7 @@ def get_schedule():
         },
         "site": "PRL",
         "enclosure": "DomeB" if USE_T2P5 else "DomeC",
-        "telescope": "T2P5" if USE_T2P5 else "T1P2",
+        "telescope": "T2P5" if USE_T2P5 else "T100",
         "start": obs2_start.isoformat(),
         "end": obs2_end.isoformat(),
         "priority": 2,
@@ -142,8 +150,8 @@ def get_schedule():
     cfg2["id"] = global_counter
     cfg2["configuration_status"] = global_counter
     global_counter += 1
-    cfg2["instrument_type"] = "LISA"
-    cfg2["instrument_name"] = "LISA"
+    cfg2["instrument_type"] = "FOC"
+    cfg2["instrument_name"] = "FOC"
     cfg2["target"]["name"] = "Jupiter"
     cfg2["target"]["type"] = "MPC_PLANET"
     cfg2["target"]["ra"] = 0.0
@@ -170,7 +178,7 @@ def get_schedule():
         },
         "site": "PRL",
         "enclosure": "DomeB" if USE_T2P5 else "DomeC",
-        "telescope": "T2P5" if USE_T2P5 else "T1P2",
+        "telescope": "T2P5" if USE_T2P5 else "T100",
         "start": obs3_start.isoformat(),
         "end": obs3_end.isoformat(),
         "priority": 3,
@@ -190,8 +198,8 @@ def get_schedule():
     cfg3["id"] = global_counter
     cfg3["configuration_status"] = global_counter
     global_counter += 1
-    cfg3["instrument_type"] = "LISA"
-    cfg3["instrument_name"] = "LISA"
+    cfg3["instrument_type"] = "FOC"
+    cfg3["instrument_name"] = "FOC"
     cfg3["target"]["name"] = "Polaris"
     cfg3["target"]["type"] = "MPC_COMET"
     cfg3["target"]["ra"] = 37.95

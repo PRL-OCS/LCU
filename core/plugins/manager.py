@@ -29,7 +29,7 @@ class PluginManager:
         logger.info("Fetching hardware mapping from API...")
         try:
             mapping_response = fetch_instruments()
-            self.hardware_mapping = {code: data.telescope_class for code, data in mapping_response.root.items()}
+            self.hardware_mapping = {data.name: data.telescope_class for code, data in mapping_response.root.items()}
             logger.info(f"Hardware mapping updated with {len(self.hardware_mapping)} relationships.")
 
         except Exception as e:

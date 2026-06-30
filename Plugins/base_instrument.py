@@ -27,6 +27,12 @@ class InstrumentPlugin(ABC):
         self.storage_dir = Path(storage_dir)
         self.observations: List[ScheduleSchema] = []
         
+        # --- Acquisition metadata (override in subclasses) ---
+        self.pixel_scale: float = 0.5    # arcsec/pixel (unbinned)
+        self.image_width: int = 2048     # detector width in pixels
+        self.image_height: int = 2048    # detector height in pixels
+        self.fov_type: str = 'wide'      # 'wide' or 'narrow'
+        
         # Determine unique storage file
         self.cache_file = self.storage_dir / f"{self.instrument_name}_configs.json"
 

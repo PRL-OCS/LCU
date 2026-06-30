@@ -8,3 +8,4 @@ watchdog==6.0.0
 nicegui==1.4.32
 scipy==1.14.0
 astroquery==0.4.7
+sep>=1.2.1

@@ -168,22 +168,33 @@ class TelescopeExecutor:
                     await self.telescope_plugin.start_tracking(target)
 
                     # --- ACQUISITION LOOP ---
-                    # Only acquire if target requires it (could be based on target.type or config)
-                    # For now, we attempt acquisition on all targets
-                    state_manager.update_observation(obs_id, ObservationState.ACQUIRING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
-                    logger.info(f"[{self.telescope_id}] Handing over to AcquisitionManager...")
-                    
-                    acquired = await self.acquisition_manager.acquire_target(target, self.telescope_plugin, matched_instrument)
-                    if not acquired:
-                        logger.error(f"[{self.telescope_id}] Failed to acquire target {target.name}. Aborting observation.")
-                        state_manager.update_observation(
-                            obs_id, 
-                            ObservationState.ABORTED, 
-                            reason="Target acquisition failed",
-                            pramana_obs_id=obs.id,
-                            pramana_config_id=pramana_config_id
-                        )
-                        continue
+                    # Read acquisition parameters from the schedule configuration
+                    acq_config = getattr(matched_config, 'acquisition_config', {}) or {}
+                    acq_mode = acq_config.get("mode", "WCS")  # Default: run acquisition
+
+                    if acq_mode.upper() == "OFF":
+                        logger.info(f"[{self.telescope_id}] Acquisition disabled (mode=OFF) for config {pramana_config_id}. Skipping.")
+                    else:
+                        state_manager.update_observation(obs_id, ObservationState.ACQUIRING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
+                        logger.info(f"[{self.telescope_id}] Handing over to AcquisitionManager (mode={acq_mode})...")
+
+                        # Override acquisition parameters from schedule if provided
+                        if "tolerance_arcsec" in acq_config:
+                            self.acquisition_manager.tolerance_arcsec = float(acq_config["tolerance_arcsec"])
+                        if "max_iterations" in acq_config:
+                            self.acquisition_manager.max_iterations = int(acq_config["max_iterations"])
+
+                        acquired = await self.acquisition_manager.acquire_target(target, self.telescope_plugin, matched_instrument)
+                        if not acquired:
+                            logger.error(f"[{self.telescope_id}] Failed to acquire target {target.name}. Aborting observation.")
+                            state_manager.update_observation(
+                                obs_id, 
+                                ObservationState.ABORTED, 
+                                reason="Target acquisition failed",
+                                pramana_obs_id=obs.id,
+                                pramana_config_id=pramana_config_id
+                            )
+                            continue
 
                     # CONFIGURING
                     state_manager.update_observation(obs_id, ObservationState.CONFIGURING, pramana_obs_id=obs.id, pramana_config_id=pramana_config_id)
