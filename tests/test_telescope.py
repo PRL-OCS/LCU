@@ -13,7 +13,7 @@ def telnet_function(name):
     
     def telnet_setup():
         HOST = "172.16.20.221"
-        tn = Telnet(HOST, "7281")
+        tn = Telnet(HOST, "7280")
         print(tn.read_until(b"\r\n").decode('utf-8', errors='ignore'))
         
         tn.write(b"unalias tndata_target\r\n")

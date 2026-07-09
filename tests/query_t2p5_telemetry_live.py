@@ -53,7 +53,7 @@ async def main():
 
         def mock_connect(self_sock, address):
             host, port = address
-            if host == "172.16.20.221" and int(port) == 7281:
+            if host == "172.16.20.221" and int(port) == 7280:
                 return original_connect(self_sock, ("127.0.0.1", server.port))
             return original_connect(self_sock, address)
 
@@ -61,7 +61,7 @@ async def main():
         connect_patcher.start()
     else:
         print("\n*** RUNNING IN LIVE HARDWARE MODE ***")
-        print("Connecting to live hardware at 172.16.20.221:7281...")
+        print("Connecting to live hardware at 172.16.20.221:7280...")
 
     print("=" * 115)
     print("  LCU T2P5 TELEMETRY MONITOR")

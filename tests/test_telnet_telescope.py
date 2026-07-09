@@ -25,7 +25,7 @@ def telnet_function(name):
     dome_status_update_time = time.time()
     def telnet_setup():
         HOST="172.16.20.221"
-        tn = Telnet(HOST,"7281")
+        tn = Telnet(HOST,"7280")
         k = tn.read_until(b"\r\n")
         print(k)
         tn.write(b"unalias tndata_target\r\n")

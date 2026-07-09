@@ -70,8 +70,10 @@ class ScheduleCoordinator:
                     logger.warning(f"Task {task.id} skipped: Telescope '{t_id}' is ready but instrument '{i_name}' plugin is missing.")
                     continue
                 
-                # 3. Logic: If we don't have the telescope, we can't do anything anyway
-                if t_id not in t_plugins:
+                # 3. Logic: If we don't have the telescope or it is offline, skip the task so it remains PENDING on PRAMANA
+                t_plugin = t_plugins.get(t_id)
+                if not t_plugin or not getattr(t_plugin, "is_connected", False):
+                    logger.warning(f"Task {task.id} skipped: Telescope '{t_id}' is offline/disconnected.")
                     continue
                 # ------------------------------
 

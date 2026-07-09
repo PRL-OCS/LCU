@@ -9,7 +9,7 @@ import threading
 from unittest.mock import patch
 
 # Ensure LCU root is in Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from Plugins.telescope.T2P5.telescope_plugin import DefaultTelescope
 from core.communications.schemas import Target

@@ -93,15 +93,28 @@ class TestT2P5Flow(unittest.TestCase):
             # 1. Read first welcome/connect message
             # Must first receive b'Connect: OK\r\n'
             buffer = b""
-            while b"\r\n" not in buffer:
+            t_start = time.time()
+            print("Waiting for telescope to connect and send handshake...")
+            while b"Connect: OK" not in buffer and time.time() - t_start < 30.0:
                 chunk = s.recv(1024)
                 if not chunk:
                     break
                 buffer += chunk
-                
-            line, sep, rest = buffer.partition(b"\r\n")
-            print(f"Received handshake: {line}")
-            self.assertIn(b"Connect: OK", line)
+                # Print whatever is received from telescope
+                print(f"[TELESCOPE] {chunk.decode('utf-8', errors='ignore')}", end="")
+            
+            self.assertIn(b"Connect: OK", buffer, "Connect: OK not received")
+            
+            # Extract line up to Connect: OK and leave the rest in the buffer
+            idx = buffer.index(b"Connect: OK")
+            eol = buffer.find(b"\r\n", idx)
+            if eol != -1:
+                line = buffer[:eol+2]
+                rest = buffer[eol+2:]
+            else:
+                line = buffer
+                rest = b""
+            print(f"\nReceived handshake: {line.decode('utf-8', errors='ignore').strip()}")
                 
             # 2. Call "get nispdatads" and print response without formatting
             # Poll only once and move on to next step once received, else wait for 15 seconds.
@@ -125,7 +138,7 @@ class TestT2P5Flow(unittest.TestCase):
             self.assertIsNotNone(nisp_line, "Did not receive nispdatads response within 15 seconds.")
             print(f"Received response: {nisp_line}")
             
-            # 3. Parse indices 10 and 11 respectively (current RA and Dec)
+            # 3. Parse indices 11 and 12 respectively (current RA and Dec when got prefix present)
             parts = nisp_line.decode("utf-8").strip().split()
             self.assertTrue(len(parts) >= 13, f"Expected at least 13 parts, got {len(parts)}")
             
