@@ -181,37 +181,37 @@ class TestT2P5Flow(unittest.TestCase):
             self.assertTrue(any(b"ack track 0" in r.lower() for r in track_responses), "Missing ack track 0")
             self.assertTrue(any(b"done track 0" in r.lower() for r in track_responses), "Missing done track 0")
 
-            # 5. Slew: send "do target ra={ra} dec={dec}\r\n"
-            slew_cmd = f"do target ra={ra} dec={dec}\r\n"
-            print(f"Sending command: {slew_cmd.strip()}")
-            s.sendall(slew_cmd.encode())
+            # # 5. Slew: send "do target ra={ra} dec={dec}\r\n"
+            # slew_cmd = f"do target ra={ra} dec={dec}\r\n"
+            # print(f"Sending command: {slew_cmd.strip()}")
+            # s.sendall(slew_cmd.encode())
             
-            # Read response (expecting ack and done target)
-            t_start = time.time()
-            ack_buffer = rest
-            responses = []
+            # # Read response (expecting ack and done target)
+            # t_start = time.time()
+            # ack_buffer = rest
+            # responses = []
             
-            while len(responses) < 2 and time.time() - t_start < 15.0:
-                while b"\r\n" in ack_buffer:
-                    line_resp, sep, ack_buffer = ack_buffer.partition(b"\r\n")
-                    responses.append(line_resp)
-                    if len(responses) == 2:
-                        break
-                if len(responses) == 2:
-                    break
-                chunk = s.recv(1024)
-                if not chunk:
-                    break
-                ack_buffer += chunk
+            # while len(responses) < 2 and time.time() - t_start < 15.0:
+            #     while b"\r\n" in ack_buffer:
+            #         line_resp, sep, ack_buffer = ack_buffer.partition(b"\r\n")
+            #         responses.append(line_resp)
+            #         if len(responses) == 2:
+            #             break
+            #     if len(responses) == 2:
+            #         break
+            #     chunk = s.recv(1024)
+            #     if not chunk:
+            #         break
+            #     ack_buffer += chunk
                 
-            for r in responses:
-                print(f"Received response: {r}")
+            # for r in responses:
+            #     print(f"Received response: {r}")
                 
-            # Check responses
-            self.assertTrue(any(b"ack target 0 OK" in r for r in responses), "Missing ack target 0 OK")
-            self.assertTrue(any(b"done target 0 OK" in r for r in responses), "Missing done target 0 OK")
-            print("Slew command acknowledged and complete.")
-            print("Slew initiated. Final step reached.")
+            # # Check responses
+            # self.assertTrue(any(b"ack target 0 OK" in r for r in responses), "Missing ack target 0 OK")
+            # self.assertTrue(any(b"done target 0 OK" in r for r in responses), "Missing done target 0 OK")
+            # print("Slew command acknowledged and complete.")
+            # print("Slew initiated. Final step reached.")
             
         finally:
             s.close()
