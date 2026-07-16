@@ -12,43 +12,45 @@ MOCK_API_DATA = {
     "id": 1,
     "request": {
         "id": 101,
-        "observation_note": "LISA Camera Live Test",
+        "observation_note": "LISA Camera Bias & Auto-Shutter Test",
         "state": "PENDING",
         "acceptability_threshold": 90.0,
         "modified": "2026-06-03T12:00:00Z",
         "duration": 600,
-        "configurations": [{
-            "id": 501,
-            "instrument_type": "LISA",
-            "type": "EXPOSE",
-            "priority": 1,
-            "instrument_configs": [{
-                "optical_elements": {"filter": "luminance"},
-                "mode": "full",
-                "exposure_time": 0.5,
-                "exposure_count": 1,
-                "rotator_mode": "SKY",
-                "extra_params": {
-                    "binning": "1x1", 
-                    "delay": 1.0,
-                    "cooling": 0,
-                    "subframe_x": 0, "subframe_y": 0, "subframe_w": 1391, "subframe_h": 1039,
-                    "dark_mode": True
+        "configurations": [
+            {
+                "id": 501,
+                "instrument_type": "LISA",
+                "type": "EXPOSE",
+                "priority": 1,
+                "instrument_configs": [{
+                    "optical_elements": {"filter": "luminance"},
+                    "mode": "full",
+                    "exposure_time": 0.001,  # Bias exposure (<=0.001s, shutter stays closed)
+                    "exposure_count": 1,
+                    "rotator_mode": "SKY",
+                    "extra_params": {
+                        "binning": "1x1", 
+                        "cooling": 0,
+                        "delay": 1.0,
+                        "subframe_x": 0, "subframe_y": 0, "subframe_w": 1391, "subframe_h": 1039,
+                        "dark_mode": True
+                    },
+                    "rois": []
+                }],
+                "target": {
+                    "type": "ICRS",
+                    "name": "Bias Frame Target",
+                    "ra": 10.684,
+                    "dec": 41.269,
+                    "epoch": 2000.0
                 },
-                "rois": []
-            }],
-            "target": {
-                "type": "ICRS",
-                "name": "Live Target",
-                "ra": 10.684,
-                "dec": 41.269,
-                "epoch": 2000.0
-            },
-            "configuration_status": 1,
-            "state": "PENDING",
-            "instrument_name": "LISA",
-            "guide_camera_name": "guider"
-        }]
+                "configuration_status": 1,
+                "state": "PENDING",
+                "instrument_name": "LISA",
+                "guide_camera_name": "guider"
+            }
+        ]
     },
     "site": "tst",
     "enclosure": "doma",
@@ -67,9 +69,9 @@ MOCK_API_DATA = {
     "modified": "2026-06-03T10:00:00Z"
 }
 
-async def run_live_test():
+async def run_bias_test():
     print("=========================================")
-    print("  LISA PLUGIN LIVE INTEGRATION TEST")
+    print("  LISA BIAS & SHUTTER INTEGRATION TEST")
     print("=========================================\n")
     
     # 1. Check command-line arguments for direct run flag
@@ -91,7 +93,7 @@ async def run_live_test():
             obs = ScheduleSchema.model_validate(MOCK_API_DATA)
             
         print(f"Scheduled Start Time: {start_time.isoformat()}")
-        print("To bypass this wait, run the script with: py tests/test_lisa_live.py --direct\n")
+        print("To bypass this wait, run the script with: py tests/test_lisa_bias.py --direct\n")
         
         while True:
             now_utc = datetime.now(timezone.utc)
@@ -106,12 +108,14 @@ async def run_live_test():
     
     print("[1] Initialising plugin (will trigger startup connect)...\n")
     api_url = os.environ.get("LISA_API_URL", "http://127.0.0.1:8004")
-    if len(sys.argv) > 1:
-        api_url = sys.argv[1]
-        if not api_url.startswith("http"):
-            api_url = f"http://{api_url}"
-            if ":" not in api_url.replace("http://", ""):
-                api_url = f"{api_url}:8004"
+    for arg in sys.argv[1:]:
+        if not arg.startswith("--"):
+            api_url = arg
+            break
+    if not api_url.startswith("http"):
+        api_url = f"http://{api_url}"
+        if ":" not in api_url.replace("http://", ""):
+            api_url = f"{api_url}:8004"
     print(f"Using API URL: {api_url}")
 
     # Early exit check: Verify the server is actually reachable before proceeding
@@ -143,17 +147,20 @@ async def run_live_test():
         return
 
     obs = ScheduleSchema.model_validate(MOCK_API_DATA)
-    config = obs.request.configurations[0]
     
-    print("\n[3] Triggering CONFIGURE (Setting filters, binning, etc.)...")
-    await plugin.configure(config)
+    for idx, config in enumerate(obs.request.configurations):
+        exp_time = config.instrument_configs[0].exposure_time
+        dark_mode_enabled = config.instrument_configs[0].extra_params.get("dark_mode", False)
+        
+        print(f"\n[{3 + idx*2}] Triggering CONFIGURE for Config {config.id} (Exposure: {exp_time}s, Dark Mode: {dark_mode_enabled})...")
+        await plugin.configure(config)
+        
+        print(f"\n[{4 + idx*2}] Triggering EXPOSE for Config {config.id}...")
+        await plugin.expose(config)
     
-    print("\n[4] Triggering EXPOSE (1x 2.0s exposure)...")
-    await plugin.expose(config)
-    
-    print("\n[5] Test sequence complete. Cleaning up...")
+    print("\n[9] Test sequence complete. Cleaning up...")
     await plugin.disconnect()
     print("Done!")
 
 if __name__ == '__main__':
-    asyncio.run(run_live_test())
+    asyncio.run(run_bias_test())

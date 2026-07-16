@@ -15,7 +15,7 @@ global_obs_counter = 1
 def get_instruments():
     return {
         "LISA": {
-            "class": "T1P2",
+            "class": "T100",
             "name": "LISA"
         },
         "T2P5_CAM": {
@@ -207,10 +207,73 @@ def get_schedule():
     cfg3["instrument_configs"][0]["exposure_time"] = 5.0
     obs3["request"]["configurations"].append(cfg3)
 
-    global_obs_counter += 3
+    # ----------------------------------------
+    # Observation 4: M31 via LISA on T100 (mock telescope)
+    # ----------------------------------------
+    obs4_start = now + timedelta(seconds=2)
+    obs4_end = obs4_start + timedelta(seconds=60)
+    
+    obs4 = {
+        "id": global_obs_counter + 3,
+        "request": {
+            "id": (global_obs_counter + 3) * 100,
+            "observation_note": "LISA Observation - M31 Andromeda",
+            "state": "PENDING",
+            "acceptability_threshold": 90.0,
+            "modified": now.isoformat(),
+            "duration": 600,
+            "configurations": []
+        },
+        "site": "PRL",
+        "enclosure": "DomeA",
+        "telescope": "T100",
+        "start": obs4_start.isoformat(),
+        "end": obs4_end.isoformat(),
+        "priority": 1,
+        "state": "PENDING",
+        "proposal": "PROP-LISA-01",
+        "submitter": "astronomer",
+        "name": "M31 LISA Obs",
+        "ipp_value": 1.0,
+        "observation_type": "NORMAL",
+        "request_group_id": 10,
+        "created": now.isoformat(),
+        "modified": now.isoformat()
+    }
+
+    # Add LISA configuration for M31
+    cfg4 = copy.deepcopy(base_config)
+    cfg4["id"] = global_counter
+    cfg4["configuration_status"] = global_counter
+    global_counter += 1
+    cfg4["instrument_type"] = "LISA"
+    cfg4["instrument_name"] = "LISA"
+    cfg4["target"]["name"] = "M31"
+    cfg4["target"]["type"] = "ICRS"
+    cfg4["target"]["ra"] = 10.684
+    cfg4["target"]["dec"] = 41.269
+    cfg4["instrument_configs"] = [{
+        "mode": "full",
+        "exposure_time": 20.0,
+        "exposure_count": 1,
+        "optical_elements": {"filter": "luminance"},
+        "rotator_mode": "SKY",
+        "extra_params": {
+            "binning": "2x2",
+            "cooling": -2.0,
+            "subframe_x": 0, "subframe_y": 0, "subframe_w": 1000, "subframe_h": 1000
+        },
+        "rois": []
+    }]
+    cfg4["acquisition_config"] = {
+        "mode": "OFF"
+    }
+    obs4["request"]["configurations"].append(cfg4)
+
+    global_obs_counter += 4
 
     return {
-        "results": [obs1, obs2, obs3]
+        "results": [obs1, obs2, obs3, obs4]
     }
 
 @app.patch("/api/observations/{obs_id}/")

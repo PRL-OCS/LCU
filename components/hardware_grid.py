@@ -218,12 +218,14 @@ def update_hardware_grid(hardware_container, status):
             hardware_container._ui_elements[f'{t_id}_active_target_container'].classes(replace='p-md border border-primary/50 bg-primary/10 rounded flex flex-col items-center justify-center text-center py-xl w-full h-full')
             hardware_container._ui_elements[f'{t_id}_active_icon'].classes(replace='text-primary mb-sm text-3xl')
             hardware_container._ui_elements[f'{t_id}_active_icon']._props['name'] = 'track_changes'
-            hardware_container._ui_elements[f'{t_id}_active_target'].set_text(f'Tracking: {current_obs}').classes(replace='text-label-md font-label-md text-primary')
+            hardware_container._ui_elements[f'{t_id}_active_target'].set_text(f'Tracking: {current_obs}')
+            hardware_container._ui_elements[f'{t_id}_active_target'].classes(replace='text-label-md font-label-md text-primary')
         else:
             hardware_container._ui_elements[f'{t_id}_active_target_container'].classes(replace='p-md border border-dashed border-outline rounded flex flex-col items-center justify-center text-center py-xl w-full h-full')
             hardware_container._ui_elements[f'{t_id}_active_icon'].classes(replace='text-outline-variant mb-sm text-3xl')
             hardware_container._ui_elements[f'{t_id}_active_icon']._props['name'] = 'inbox'
-            hardware_container._ui_elements[f'{t_id}_active_target'].set_text('No active target in queue').classes(replace='text-label-md font-label-md text-on-surface-variant')
+            hardware_container._ui_elements[f'{t_id}_active_target'].set_text('No active target in queue')
+            hardware_container._ui_elements[f'{t_id}_active_target'].classes(replace='text-label-md font-label-md text-on-surface-variant')
             
         # Update extra telemetry
         extra_container = hardware_container._ui_elements.get(f'{t_id}_extra_telemetry')
@@ -286,7 +288,8 @@ def update_hardware_grid(hardware_container, status):
                 elif i_state in ['FAILED', 'ABORTED']:
                     i_color = 'text-error'
                     
-                hardware_container._ui_elements[f'{i_id}_state'].set_text(i_state).classes(replace=f'text-headline-md font-headline-md {i_color}')
+                hardware_container._ui_elements[f'{i_id}_state'].set_text(i_state)
+                hardware_container._ui_elements[f'{i_id}_state'].classes(replace=f'text-headline-md font-headline-md {i_color}')
                 
                 exposure_start = executors.get(t_id, {}).get('exposure_start_time')
                 exposure_dur = executors.get(t_id, {}).get('exposure_duration')

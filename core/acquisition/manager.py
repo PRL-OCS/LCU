@@ -237,6 +237,7 @@ class AcquisitionManager:
         fov_arcmin = max(image_width, image_height) * pixel_scale / 60.0
 
         # 1. Source Extraction from the FITS image
+        is_mock = not isinstance(image, str) or not os.path.exists(image)
         observed_points = self._extract_image_sources(image)
         if len(observed_points) < 3:
             logger.warning(f"Not enough stars found in image for pattern matching ({len(observed_points)} detected).")
@@ -247,7 +248,8 @@ class AcquisitionManager:
             target, fov_size=fov_arcmin,
             pixel_scale=pixel_scale,
             image_width=image_width,
-            image_height=image_height
+            image_height=image_height,
+            force_mock=is_mock
         )
         if len(catalog_points) < 3:
             logger.warning(f"Not enough stars found in catalog for this FOV ({len(catalog_points)} found).")
@@ -338,7 +340,8 @@ class AcquisitionManager:
     def _query_catalog(self, target, fov_size: float = 3.0,
                        pixel_scale: float = 0.5,
                        image_width: int = 2048,
-                       image_height: int = 2048) -> np.ndarray:
+                       image_height: int = 2048,
+                       force_mock: bool = False) -> np.ndarray:
         """
         Queries Gaia DR3 for stars within `fov_size` arcminutes of the target,
         and projects their RA/Dec onto pixel coordinates using a tangent-plane
@@ -347,6 +350,10 @@ class AcquisitionManager:
         Falls back to a hardcoded mock array if astroquery is unavailable
         or the query fails.
         """
+        if force_mock:
+            logger.info("Forcing mock catalog for simulated/mock image.")
+            return self._mock_query_catalog()
+
         try:
             from astroquery.vizier import Vizier
             from astropy.coordinates import SkyCoord
@@ -462,8 +469,12 @@ class AcquisitionManager:
 
         Falls back to the legacy mock behavior if astroquery is unavailable.
         """
-        # Legacy mock fast-path: if the telescope plugin has a hop_success attribute
-        # and we can't do a real hop, use it
+        # Mock fast-path for unit tests and simulation
+        if hasattr(telescope_plugin, 'hop_success'):
+            logger.info("Using mock/simulated Bright Star Hop.")
+            await asyncio.sleep(0.5)
+            return telescope_plugin.hop_success
+
         try:
             from astroquery.vizier import Vizier
             from astropy.coordinates import SkyCoord
